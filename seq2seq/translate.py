@@ -147,7 +147,7 @@ def translate_file(source_path=dev_code_file, target_path=translated_dev_code):
     gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.4)
     with tf.Session(config = tf.ConfigProto(gpu_options = gpu_options)) as sess:
         # Create model and load parameters.
-        model = create_model(sess, True)
+        model = create_model(sess, True, FLAGS)
         model.batch_size = 1  # We decode one sentence at a time.
 
         # Load vocabularies.
@@ -214,14 +214,14 @@ def translate_file(source_path=dev_code_file, target_path=translated_dev_code):
                 
 
 
-def create_model(session, forward_only):
+def create_model(session, forward_only, flags):
   """Create translation model and initialize or load parameters in session."""
   model = seq2seq_model.Seq2SeqModel(
-      FLAGS.code_vocab_size, FLAGS.en_vocab_size, _buckets,
-      FLAGS.size, FLAGS.num_layers, FLAGS.max_gradient_norm, FLAGS.batch_size,
-      FLAGS.learning_rate, FLAGS.learning_rate_decay_factor,
+      flags.code_vocab_size, flags.en_vocab_size, _buckets,
+      flags.size, flags.num_layers, flags.max_gradient_norm, flags.batch_size,
+      flags.learning_rate, flags.learning_rate_decay_factor,
       forward_only=forward_only)
-  ckpt = tf.train.get_checkpoint_state(FLAGS.train_dir)
+  ckpt = tf.train.get_checkpoint_state(flags.train_dir)
   if ckpt and ckpt.model_checkpoint_path:
     print("Reading model parameters from %s" % ckpt.model_checkpoint_path)
     model.saver.restore(session, ckpt.model_checkpoint_path)
@@ -243,7 +243,7 @@ def train():
     with tf.Session(config = tf.ConfigProto(gpu_options = gpu_options)) as sess:
         # Create model.
         print("Creating %d layers of %d units." % (FLAGS.num_layers, FLAGS.size))
-        model = create_model(sess, False)
+        model = create_model(sess, False, FLAGS)
 
         # Read data into buckets and compute their sizes.
         print ("Reading development and training data (limit: %d)."
@@ -358,7 +358,7 @@ def evaluate():
 def decode():
     with tf.Session() as sess:
         # Create model and load parameters.
-        model = create_model(sess, True)
+        model = create_model(sess, True, FLAGS)
         model.batch_size = 1  # We decode one sentence at a time.
 
         # Load vocabularies.

@@ -23,7 +23,7 @@ python translate.py --num_layers=3 --evaluate
 
 - Run interactive translation mode (only works when the model has been trained): 
 ```bash
-python translate.py --num_layers=3 --step_per_checkpoint=50 --decode
+python translate.py --num_layers=3 --decode
 ```
 
 ### Options
