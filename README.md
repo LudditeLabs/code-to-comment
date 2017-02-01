@@ -10,7 +10,7 @@ source ~/tensorflow/bin/activate
 - Install requirements
 ```bash
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r seq2se2/requirements.txt
 ```
 - Run training. Note, the trainig process has infinite loop in it:
 ```bash
