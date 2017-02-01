@@ -26,6 +26,11 @@ python translate.py --num_layers=3 --evaluate
 python translate.py --num_layers=3 --decode
 ```
 
+- Run flask app with web server in Docker
+```bash
+deocker-compose up -d
+```
+
 ### Options
 - add --evaluate to see the score with a trained model on the development file (default False)
 - add --size=XX to change size of LSTM layer to XX (default 256)
