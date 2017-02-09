@@ -31,6 +31,8 @@ python translate.py --num_layers=3 --decode
 deocker-compose up -d
 ```
 
+The server is up at localhost port 80 by default. The welcome page is awailable for tests
+
 ### Options
 - add --evaluate to see the score with a trained model on the development file (default False)
 - add --size=XX to change size of LSTM layer to XX (default 256)
