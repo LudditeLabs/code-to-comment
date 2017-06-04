@@ -76,6 +76,7 @@ def filterDocString(source, startLine, codeFile, commentFile, maxBucket):
     indentation = -1
     currIndent = -1
     code = []
+    globalI = len(source) + 10
 
     # add the first line to the comment and check for single line docstrings
     count = (source[startLine].count('"""'))

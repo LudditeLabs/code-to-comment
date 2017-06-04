@@ -7,16 +7,23 @@ import subprocess
 import sys
 import getDocStrings
 import getComments
+import os
 import os.path as op
+import argparse
 from const import DELIMITER, MAX_BUCKET
 
-
+base_path = "/home/konstantin/work/ludditelabs/data/"
+"""
 directories = ["edx-platform-master", "django-master", "pandas-master",
                "pylearn2-master", "salt-develop", "scikit-learn-master"]
-originalPath = "original/"
-processedPath = "processed/raw/"
-trainingFile = "processed/trainingFormat/"
-readableFile = "processed/readableFormat/"
+"""
+directories = ["edx-platform", "django", "pandas", "pylearn2", "salt", "scikit-learn"]
+originalPath = op.join(base_path, "original/")
+processedPath = op.join(base_path, "processed/raw/")
+trainingFile = op.join(base_path, "processed/trainingFormat/")
+readableFile = op.join(base_path, "processed/readableFormat/")
+
+all_paths = [originalPath, processedPath, trainingFile, readableFile]
 
 commentCodeExt = ".commentCode"
 commentExt = ".comment"
@@ -61,8 +68,8 @@ def getCommentPairs(files_w_comments, directory):
         Returns:
     """
 
-    codeFile = op.join(processedPath, directory, commentCodeExt)  # output file with code fragments
-    commentFile = op.join(processedPath, directory, commentExt)  # output file with comments
+    codeFile = op.join(processedPath, directory + commentCodeExt)  # output file with code fragments
+    commentFile = op.join(processedPath, directory + commentExt)  # output file with comments
 
     # loop through all files with block comments
     print "\nBlock comments:"
@@ -93,8 +100,8 @@ def getDocStringPairs(files_w_doc_strings, directory):
 
         Returns:
     """
-    codeFile = op.join(processedPath, directory, docstringCodeExt)  # output file with code fragments
-    commentFile = op.join(processedPath, directory, docstringExt)  # output file with comments
+    codeFile = op.join(processedPath, directory + docstringCodeExt)  # output file with code fragments
+    commentFile = op.join(processedPath, directory + docstringExt)  # output file with comments
 
     # loop through all files with docstrings
     print "\nDocstrings:"
@@ -144,8 +151,8 @@ def createReadableFormat(file, codeF, commentF, counter):
 
     with open(file, "a") as file:
         for directory in directories:
-            codeFile = op.join(processedPath, directory, codeF)
-            commentFile = op.join(processedPath, directory, commentF)
+            codeFile = op.join(processedPath, directory + codeF)
+            commentFile = op.join(processedPath, directory + commentF)
 
             # read the lines and do some string / list conversion stuff
             codeLines = open(codeFile, "r").readlines()
@@ -183,8 +190,8 @@ def createTrainingFile(eFile, cFile, codeFileExtension, commentFileExtension, di
     """
     with open(eFile, "a") as enFile, open(cFile, "a") as codeFile:
         # get the processed files in raw format
-        codeFileName = op.join(processedPath, directory, codeFileExtension)
-        commentFileName = op.join(processedPath, directory, commentFileExtension)
+        codeFileName = op.join(processedPath, directory + codeFileExtension)
+        commentFileName = op.join(processedPath, directory + commentFileExtension)
 
         # read the lines and remove annoying spaces / enters and stuff
         codeLines = open(codeFileName, "r").readlines()
@@ -210,8 +217,8 @@ def createSeperateTrainingFiles():
         each repository into single .en and .code files
     """
     for directory in directories:
-        enFile = op.join(trainingFile, directory, ".en")
-        codeFile = op.join(trainingFile, directory, ".code")
+        enFile = op.join(trainingFile, directory + ".en")
+        codeFile = op.join(trainingFile, directory + ".code")
 
         # convert the docstring-code pairs and comment-code pairs into two large files
         createTrainingFile(enFile, codeFile, commentCodeExt, commentExt, directory)
@@ -230,8 +237,8 @@ def concatenateTrainingFiles():
     with open(enFileAll, 'w') as enFileAll, open(codeFileAll, 'w') as codeFileAll:
         for directory in directories:
             # get seperate training files of this directory
-            enFile = op.join(trainingFile, directory, ".en")
-            codeFile = op.join(trainingFile, directory, ".code")
+            enFile = op.join(trainingFile, directory + ".en")
+            codeFile = op.join(trainingFile, directory + ".code")
 
             # write the comments to the comment file
             with open(enFile) as enFile:
@@ -244,7 +251,29 @@ def concatenateTrainingFiles():
                     codeFileAll.write(line)
 
 
-if __name__ == '__main__':
+def parse_args():
+    parser = argparse.ArgumentParser('sync_roster')
+
+    parser.add_argument('-d', '--data_path', type=str, default=None, help='base path to data folder')
+
+    args = parser.parse_args()
+    return args
+
+
+def main():
+    global base_path, originalPath, processedPath, trainingFile, readableFile
+    args = parse_args()
+    if args.data_path:
+        base_path = args.data_path
+        originalPath = op.join(base_path, "original/")
+        processedPath = op.join(base_path, "processed/raw/")
+        trainingFile = op.join(base_path, "processed/trainingFormat/")
+        readableFile = op.join(base_path, "processed/readableFormat/")
+
+    for d in all_paths:
+        if not op.exists(d):
+            os.makedirs(d)
+
     print "Creating Code-Comment pairs.."
     createCCPair()
     print "-" * 50
@@ -260,3 +289,7 @@ if __name__ == '__main__':
 
     print "Converting into single training file.."
     concatenateTrainingFiles()
+
+
+if __name__ == '__main__':
+    main()

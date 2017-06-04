@@ -104,6 +104,7 @@ def filterComment(source, startLine, codeFile, commentFile, maxBucket):
     indentation = -1
     currIndent = -1
     code = []
+    globalI = len(source) + 10
 
     # loop through all the lines in the source, get the comment
     # and the corresponding code
@@ -173,7 +174,7 @@ def filterComment(source, startLine, codeFile, commentFile, maxBucket):
             for j in xrange(len(code)):
                 codeF.write(code[j] + "\n")
             codeF.write(DELIMITER)
-            commentF.write(util.cleanComment(comment) + "\n!" + DELIMITER)
+            commentF.write(util.cleanComment(comment) + "\n" + DELIMITER)
 
             return (globalI+1, True)
         else:
