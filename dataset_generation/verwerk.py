@@ -252,7 +252,7 @@ def concatenateTrainingFiles():
 
 
 def parse_args():
-    parser = argparse.ArgumentParser('sync_roster')
+    parser = argparse.ArgumentParser('verwerk')
 
     parser.add_argument('-d', '--data_path', type=str, default=None, help='base path to data folder')
 

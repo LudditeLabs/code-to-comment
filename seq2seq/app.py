@@ -24,7 +24,7 @@ code_vocab_path = None
 en_vocab_path = None
 code_vocab = None
 rev_en_vocab = None
-_buckets = [(5, 10), (10, 15), (20, 25), (40, 50), (250,100)]
+_buckets = [(5, 10), (10, 15), (20, 25), (40, 50), (250, 100)]
 
 tf.app.flags.FLAGS.num_layers = 3
 FLAGS = tf.app.flags.FLAGS
@@ -65,9 +65,10 @@ def index():
 
 @app.route('/api', methods=['POST'])
 def api():
+    print('API called')
 
-    if "key" not in request.values and request.values["key"] != app.config["APIKEY"]:
-        return Response("Not authorized, please pass 'key' url parameter with APIKEY", 401)
+    #if "key" not in request.values and request.values["key"] != app.config["APIKEY"]:
+    #    return Response("Not authorized, please pass 'key' url parameter with APIKEY", 401)
 
     if "q" not in request.values:
         return Response("No q parameter", 500)
@@ -83,6 +84,7 @@ def api():
 
 
 if __name__ == '__main__':
+    print('&'*100)
     if not app.config["DEBUG"]:
         sess = tf.Session()
         model = create_model(sess, True, FLAGS)

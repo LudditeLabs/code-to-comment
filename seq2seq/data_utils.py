@@ -200,7 +200,7 @@ def data_to_token_ids(data_path, target_path, vocabulary_path,
         with gfile.GFile(data_path, mode="rb") as data_file, gfile.GFile(target_path, mode="w") as tokens_file:
             lines = data_file.readlines()
             for i, line in enumerate(lines):
-                if i % 100000 == 0:
+                if i % 1000 == 0:
                     print("  tokenizing line %d" % i)
                 token_ids = sentence_to_token_ids(line, vocab, tokenizer,
                                                   normalize_digits)
