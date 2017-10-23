@@ -12,7 +12,7 @@ import os.path as op
 import argparse
 from const import DELIMITER, MAX_BUCKET
 
-base_path = "/home/konstantin/work/ludditelabs/data/"
+base_path = "/home/konstantin/work/ludditelabs/data_test/"
 """
 directories = ["edx-platform-master", "django-master", "pandas-master",
                "pylearn2-master", "salt-develop", "scikit-learn-master"]
@@ -50,6 +50,8 @@ def getFileList(directory):
         # get a list of all files with doc strings
         doc_strings = subprocess.check_output(["grep -r -l --include \*.py '\"\"\"' " + directory], shell=True)
         files_w_doc_strings = doc_strings.splitlines()
+        doc_strings = subprocess.check_output(["grep -r -l --include \*.py '\'\'\' " + directory], shell=True)
+        files_w_doc_strings += doc_strings.splitlines()
         print "Found %d files with doc strings" % len(files_w_doc_strings)
     except:
         print "Unexpected error, most likely no doc strings or comments found. Does the directory exist? \n The error:", sys.exc_info()[0]
@@ -197,19 +199,18 @@ def createTrainingFile(eFile, cFile, codeFileExtension, commentFileExtension, di
         codeLines = open(codeFileName, "r").readlines()
         codeLines = "".join(codeLines)
         codeLines = " ".join(codeLines.split())
-        codeLines = "".join(codeLines)
         codeLines = codeLines.split(DELIMITER)
         commentLines = open(commentFileName, "r").readlines()
         commentLines = "".join(commentLines)
         commentLines = commentLines.split(DELIMITER)
 
         # loop through the lines
-        for i in xrange(len(codeLines)):
-            if "Parameters ----------" in commentLines[i]:
-                commentLines[i] = commentLines[i].split("Parameters ----------")[0].strip()
-            if codeLines[i].strip() != '' and commentLines[i].strip() != '':
-                codeFile.write(codeLines[i].strip().replace("\n", "") + "\n")
-                enFile.write(commentLines[i].strip().replace("\n", "") + "\n")
+        for code, comment in zip(codeLines, commentLines):
+            code = code.strip().replace("\n", "")
+            comment = comment.strip().replace("\n", "")
+            if code and comment:
+                codeFile.write(code + "\n")
+                enFile.write(comment + "\n")
 
 
 def createSeperateTrainingFiles():
@@ -269,6 +270,7 @@ def main():
         processedPath = op.join(base_path, "processed/raw/")
         trainingFile = op.join(base_path, "processed/trainingFormat/")
         readableFile = op.join(base_path, "processed/readableFormat/")
+        all_paths = [originalPath, processedPath, trainingFile, readableFile]
 
     for d in all_paths:
         if not op.exists(d):

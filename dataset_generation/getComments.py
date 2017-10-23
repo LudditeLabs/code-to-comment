@@ -7,7 +7,7 @@ import util
 from const import DELIMITER, COMMENT_LIST, COMMENT_EXCEPTIONS
 
 
-def generate_pairs(source, codeFile, commentFile, maxBucket, module='<string>'):
+def generate_pairs(source, codeFile, commentFile, maxBucket):
     """ Loop through the source code and get comments and
         their correspondig code.
 
@@ -16,73 +16,43 @@ def generate_pairs(source, codeFile, commentFile, maxBucket, module='<string>'):
             codeFile: Output file (file object) with code fragments.
             commentFile: Output file (file object) with corresponding comments.
             maxBucket: .
-            module: .
 
         Returns:
             Tuple (normalCommentsCount, inlineCommentsCount, rejectedCommentsCount)
     """
 
-    filename = getattr(source, 'name', module)
-    module = splitext(basename(filename))[0]
     source = source.read().splitlines()
 
-    normalComments = 0
+    commentsCnt = {False: 0, True: 0}
     inlineComments = 0
-    rejectedComments = 0
-
-    i = -1
-    count = 0
+    i = 0
 
     # check each line for comments
     while i < len(source):
         line = source[i]
-
         # check if the line starts with an comment, if so
         # get the comment and code, and skip to the correct line after
         # the comment
         if line.strip()[:2] in COMMENT_LIST:
             (i, success) = filterComment(source, i, codeFile, commentFile, maxBucket)
-
-            if count != 0 and i == count:
-                sys.exit(0)
-
-            count = i
-
-            # only increment the count if there was no error
-            if success:
-                normalComments += 1
-            else:
-                rejectedComments += 1
+            commentsCnt[success] += 1
             continue
-
         # check if we have an inline comment
-        # if "# " in line.strip():
-        #     parts = line.split("# ")
-
-        #     if len(parts) != 2:
-        #         pass
-        #         # print ">Something is not right, skipping comment"
-        #     else:
-        #         code = parts[0].strip()
-        #         comment = parts[1].strip().replace("#")
-
-        #         if comment != "" and code != "":
-        #             inlineComments += 1
-
-        #             with open(commentFile, "a") as commentF:
-        #                 commentF.write(comment + "\n!@#$%!@#$%!@#$%!@#$%!@#$%")
-
-        #             with open(codeFile, "a") as codeF:
-        #                 codeF.write(code.strip() + "\n!@#$%!@#$%!@#$%!@#$%!@#$%")
-        #                 # codeF.write(" ".join([x.strip() for x in code]) + "\n")
-
-        #             # print ">Comment:" , comment
-        #             # print ">Code: \n" , code
-
-        # increment by one
+        elif "# " in line.strip():
+            parts = line.split("# ")
+            if len(parts) != 2:
+                break
+            code = parts[0].strip()
+            comment = parts[1].strip()
+            if code and comment:
+                inlineComments += 1
+                with open(commentFile, "a") as commentF, open(codeFile, "a") as codeF:
+                    codeF.write(code + "\n" + DELIMITER)
+                    commentF.write(comment + "\n" + DELIMITER)
+        # move to next line
         i += 1
 
-    return (normalComments, inlineComments, rejectedComments)
+    return (commentsCnt[True], inlineComments, commentsCnt[False])
 
 
 def filterComment(source, startLine, codeFile, commentFile, maxBucket):
@@ -100,86 +70,53 @@ def filterComment(source, startLine, codeFile, commentFile, maxBucket):
             Tuple (number of line from which continue search, flag)
     """
 
-    comment = ""
-    indentation = -1
-    currIndent = -1
-    code = []
+    indentation = None
+    curIndent = -1
     globalI = len(source) + 10
 
-    # loop through all the lines in the source, get the comment
-    # and the corresponding code
+    curLine = int(startLine)
+    comment = ""
+    # at first, we should get entire comment (which could be multiline)
+    while curLine < len(source):
+        line = source[curLine]
+        curIndent = len(line) - len(line.lstrip())
+        if not indentation:
+            indentation = curIndent
+        if line.strip()[:2] not in COMMENT_LIST or indentation > curIndent:
+            break
+        comment += line.strip()[2:] + " "
+        curLine += 1
+
+    # check if comment is empty
+    if not comment.strip():
+        return (curLine, False)
+
+    code = []
+    while curLine < len(source):
+        line = source[curLine]
+        curIndent = len(line) - len(line.lstrip())
+        # if we have some elements in code and get an empty line, finish
+        if not line.strip() and code:
+            break
+        # if indentation changed or line have an inline comment, finish
+        if indentation > curIndent or (any(c in line for c in COMMENT_LIST)):
+            break
+        code.append(line)
+        curLine += 1
+
+    if not code:
+        return (curLine, False)
+
+    if util.tokenize(" ".join(code)) >= maxBucket[0] or util.tokenize(comment) >= maxBucket[1] \
+        or (any(exc in comment.lower() for exc in COMMENT_EXCEPTIONS)):
+        return (curLine, False)
+
     with open(commentFile, "a") as commentF, open(codeFile, "a") as codeF:
-        for i in xrange(startLine, len(source)):
-            globalI = i
-            line = source[i]
-
-            # comments need to be directly above code
-            if line.strip() == "" and comment == "":
-                return (i, False)
-
-            # Continue if we have an divider row
-            if line.replace("#", "").strip() == "" and line.strip() != "":
-                continue
-
-            # check if it is an comment, and if so add it to the comment
-            if line.strip()[:2] in COMMENT_LIST:
-                comment += line.strip().replace("#", "") + " "
-                continue
-
-            # lines with docstrings are skipped
-            if '"""' in line or "'''" in line:
-                return (i, False)
-
-            # if we get here, it means we are not in the comment anymore
-            # First get the indentation level of the current line of code
-            currIndent = len(line) - len(line.lstrip())
-
-            # If it is the first line of code, set our indentation level
-            if indentation == -1:
-                indentation = currIndent
-
-            # if we hit an empty line and have no code yet, return with an error
-            if line.strip() == "" and code == []:
-                return (i, False)
-
-            # if we hit an empty line or go to an parent piece in the code
-            # return the gathered code
-            if line.strip() == "" or indentation > currIndent or (any(c in line for c in COMMENT_LIST)):
-                code = util.cleanCode(code)
-
-                # no need to save code-comment pairs larger than maxBucket size
-                if util.tokenize("".join(code)) < maxBucket[0] and util.tokenize(comment) < maxBucket[1] \
-                and not (any(exc in comment.lower() for exc in COMMENT_EXCEPTIONS)):
-                    # write to file
-                    for j in xrange(len(code)):
-                        codeF.write(code[j] + "\n")
-                    codeF.write(DELIMITER)
-                    commentF.write(util.cleanComment(comment) + "\n" + DELIMITER)
-
-                    return (i, True)
-                else:
-                    return (i, False)
-
-            # add the line to our code if all is well (without any inline comments if any)
-            if line.strip() != "":
-                code.append(line)
-
-        code = util.cleanCode(code)
-
-        # if we are here check if we have a comment / code not empty and smaller than maxBucket size
-        if comment.strip() != "" and code != [] and \
-        util.tokenize("".join(code)) < maxBucket[0] and util.tokenize(comment) < maxBucket[1] \
-        and not (any(exc in comment.lower() for exc in COMMENT_EXCEPTIONS)):
-            # write to file
-            for j in xrange(len(code)):
-                codeF.write(code[j] + "\n")
-            codeF.write(DELIMITER)
-            commentF.write(util.cleanComment(comment) + "\n" + DELIMITER)
-
-            return (globalI+1, True)
-        else:
-            return (globalI+1, False)
-
+        # write to file
+        codeF.write("\n".join(code))
+        codeF.write(DELIMITER)
+        commentF.write(comment + "\n" + DELIMITER)
+    return (curLine, True)
 
 if __name__ == '__main__':
     pass
