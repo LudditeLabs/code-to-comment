@@ -9,6 +9,7 @@ import os
 import os.path as op
 import re
 import sys
+import sqlite3
 
 
 _logger = logging.getLogger(__name__)
@@ -20,8 +21,9 @@ logging.basicConfig(
 
 DELIMITER = "!@#$%!@#$%!@#$%!@#$%!@#$%"
 COMMENT_LIST = ["# "]
+STR_LITERALS = ["\"\"\"", "\'\'\'"]
 COMMENT_EXCEPTIONS = ["todo", "to do"]
-INLINE_COMMENT_EXCEPTIONS = ["pylint"]
+INLINE_COMMENT_EXCEPTIONS = ["pylint"] + COMMENT_EXCEPTIONS
 
 CLEAN_CHAR = ["#"]
 
@@ -78,13 +80,44 @@ def _clean_str(inpstr):
 
 class CodeCommentDataset():
 
-    _BUCKETS = [(10, 10), (20, 20), (30, 30), (40, 40)]
-
-    def __init__(self, buckets=None, blockcomment=True, inlinecomment=True):
-        if buckets:
-            self._BUCKETS = buckets
+    def __init__(self, blockcomment=True, inlinecomment=True, outdb='codecomment.db'):
         self.blockcomment = blockcomment
         self.inlinecomment = inlinecomment
+        self.conn = sqlite3.connect(outdb)
+        self._init_db()
+
+    def _init_db(self):
+        cur = self.conn.cursor()
+        cur.execute('''CREATE TABLE IF NOT EXISTS sources (id INTEGER PRIMARY KEY, path TEXT, repo TEXT)''')
+        cur.execute('''CREATE TABLE IF NOT EXISTS code_comment (id INTEGER PRIMARY KEY, 
+                                                                code TEXT,
+                                                                comment TEXT,
+                                                                line INTEGER,
+                                                                is_inline INTEGER,
+                                                                source_id INTEGER)''')
+
+    def _save_result_db(self, filelist, pairs):
+        fileids = {}
+        cur = self.conn.cursor()
+        _logger.info("Inserting into DB information about processed files started")
+        cur.execute('BEGIN TRANSACTION')
+        for f in filelist:
+            cur.execute('''INSERT OR IGNORE INTO sources (path, repo) VALUES (?, ?)''', (f, ''))
+            fileids[f] = cur.lastrowid
+        cur.execute('COMMIT')
+        _logger.info("Inserting into DB information about processed files finished")
+
+        _logger.info("Inserting into DB information about founded code-comment pairs started")
+        cur.execute('BEGIN TRANSACTION')
+        for k, v in pairs.items():
+            for e in v:
+                cur.execute('''INSERT OR IGNORE INTO 
+                                    code_comment (code, comment, line, is_inline, source_id)
+                                VALUES
+                                    (?, ?, ?, ?, ?)
+                            ''', (e['pair'][0], e['pair'][1], e['linenum'], e['is_inline'], fileids[k]))
+        cur.execute('COMMIT')
+        _logger.info("Inserting into DB information about founded code-comment pairs finished")
 
     def _get_block_comment(self, source, linenum):
         """ Check for a multiline comment and get the corresponding code.
@@ -96,8 +129,6 @@ class CodeCommentDataset():
             Returns:
                 Tuple (number of line from which continue search, flag, (code, comment))
         """
-        maxbucket = self._BUCKETS[-1]
-
         indentation = None
         curindentation = -1
 
@@ -137,8 +168,8 @@ class CodeCommentDataset():
         if not code:
             return (curline, False, (None, None))
 
-        if _tokenize(" ".join(code)) >= maxbucket[0] or _tokenize(comment) >= maxbucket[1] \
-            or (any(exc in comment.lower() for exc in COMMENT_EXCEPTIONS)):
+        #if _tokenize(" ".join(code)) >= maxbucket[0] or _tokenize(comment) >= maxbucket[1] \
+        if any(exc in comment.lower() for exc in COMMENT_EXCEPTIONS):
             return (curline, False, (None, None))
 
         return (curline, True, (code, comment))
@@ -164,28 +195,37 @@ class CodeCommentDataset():
 
         while curline < len(sources):
             line = sources[curline]
+            # check if line is begining of str literal
+            if any(line.strip().startswith(e) and line.count(e) % 2 for e in STR_LITERALS):
+                literal = line.strip()[:3]
+                curline += 1
+                while curline < len(sources) and sources[curline].count(literal) == 0:
+                    curline += 1
+                curline += 1
+                continue
+
             # check if line is begining of block comment
             if self.blockcomment and line.strip()[:2] in COMMENT_LIST:
                 (curline, success, pair) = self._get_block_comment(sources, curline)
                 if success:
-                    founded_pairs.append(pair)
+                    founded_pairs.append({'pair': pair, 'is_inline': False, 'linenum': curline})
                 comments_cnt[success] += 1
                 continue
 
-            if self.inlinecomment and "# " in line.strip() and not any(e in line for e in INLINE_COMMENT_EXCEPTIONS):
+            if self.inlinecomment and "# " in line.strip() and not any(e in line.lower() for e in INLINE_COMMENT_EXCEPTIONS):
                 parts = line.split("# ", 2)
                 if len(parts) != 2:
                     break
                 code = _clean_str(parts[0].strip())
                 comment = _clean_str(parts[1].strip())
                 if code and comment:
-                    founded_pairs.append((code, comment))
+                    founded_pairs.append({'pair': (code, comment), 'is_inline': True, 'linenum': curline})
                     comments_inline += 1
             curline += 1
 
         return (comments_cnt[True], comments_inline, comments_cnt[False], founded_pairs)
 
-    def _get_comments(self, fileslist, outputfile):
+    def _get_comments(self, fileslist):
         """ Extract code-comment pairs from all files
 
             Args:
@@ -193,7 +233,7 @@ class CodeCommentDataset():
 
             Returns:
         """
-        founded_pairs = []
+        founded_pairs = {}
         normalcomments = 0
         inlinecomments = 0
         rejectedcomments = 0
@@ -201,7 +241,7 @@ class CodeCommentDataset():
             if i % 100 == 0:
                 _logger.info("Processed {} files of {}".format(i, len(fileslist)))
             (x, y, z, pairs) = self._get_pairs(file)
-            founded_pairs.extend(pairs)
+            founded_pairs[file] = pairs
             normalcomments += x
             inlinecomments += y
             rejectedcomments += z
@@ -211,13 +251,7 @@ class CodeCommentDataset():
         _logger.info("Inline comments: {}".format(inlinecomments))
         _logger.info("Rejected comments: {}".format(rejectedcomments))
 
-        output_code = outputfile + ".code"
-        output_comment = outputfile + ".comment"
-
-        with open(output_code, 'a') as ocode, open(output_comment, 'a') as ocomment:
-            for code, comment in founded_pairs:
-                ocode.write(code + "\n" + DELIMITER)
-                ocomment.write(comment + "\n" + DELIMITER)
+        self._save_result_db(fileslist, founded_pairs)
 
     def _get_dstrings(self, fileslist):
         pass
@@ -249,15 +283,15 @@ class CodeCommentDataset():
 
 
 def main(datapath, outputpath):
-    dataset = CodeCommentDataset(blockcomment=False)
-    dataset.prepare_data_dir(datapath, outputpath)
+    dataset = CodeCommentDataset(blockcomment=False, outdb=outputpath)
+    dataset.prepare_data_dir(datapath)
 
 
 def parse_args():
     parser = argparse.ArgumentParser('dataset')
 
     parser.add_argument('-d', '--data_path', type=str, default=None, help='base path to data folder')
-    parser.add_argument('-o', '--output_path', type=str, default=None, help='base path to data folder')
+    parser.add_argument('-o', '--output_path', type=str, default=None, help='base path to output sqlite db')
 
     args = parser.parse_args()
     return args
