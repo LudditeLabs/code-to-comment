@@ -8,6 +8,8 @@ import os.path as op
 import re
 import logging
 import sqlite3
+import argparse
+import sys
 
 _logger = logging.getLogger(__name__)
 
@@ -17,10 +19,10 @@ logging.basicConfig(
 )
 
 # Special vocabulary symbols - we always put them at the start.
-_PAD = b"_PAD"
-_GO = b"_GO"
-_EOS = b"_EOS"
-_UNK = b"_UNK"
+_PAD = "_PAD"
+_GO = "_GO"
+_EOS = "_EOS"
+_UNK = "_UNK"
 _START_VOCAB = [_PAD, _GO, _EOS, _UNK]
 
 PAD_ID = 0
@@ -29,8 +31,8 @@ EOS_ID = 2
 UNK_ID = 3
 
 # Regular expressions used to tokenize.
-_WORD_SPLIT = re.compile(b"([`.,!?\"':;)(])")
-_DIGIT_RE = re.compile(br"\d")
+_WORD_SPLIT = re.compile("([`.,!?\"':;)(])")
+_DIGIT_RE = re.compile(r"\d")
 
 
 # def python_tokenizer(sentence):
@@ -73,16 +75,44 @@ def basic_tokenizer(sentence):
 
 class DataSource():
 
-    def __init__(self, dbpath, output_dir, validation_ratio=None):
+    def __init__(self, dbpath, output_dir, validation_ratio=0.2):
         if not op.exists(dbpath):
             _logger.error("DB doesn't exists at path {}".format(dbpath))
         self.conn = sqlite3.connect(dbpath)
-        self.validation_ration = validation_ratio if validation_ratio else 0
+        self.validation_ratio = validation_ratio if validation_ratio else 0
         self.output_dir = output_dir
+        self.codes = []
+        self.comments = []
+        self.codes_train = []
+        self.codes_val = []
+        self.comments_train = []
+        self.comments_val = []
+
+    def _get_data_db(self, inline=False):
+        cur = self.conn.cursor()
+        cur.execute("SELECT code, comment FROM code_comment WHERE is_inline=0")  # Temporary decision
+        res = cur.fetchall()
+        if not res:
+            return
+        for r in res:
+            self.codes.append(r[0])
+            self.comments.append(r[1])
+
+    def _split_data(self):
+        if not self.validation_ratio:
+            self.codes_train = self.codes
+            self.comments_train = self.comments
+            return
+
+        split_point = int(len(self.codes) * self.validation_ratio)
+        self.codes_train = self.codes[split_point:]
+        self.codes_val = self.codes[:split_point]
+        self.comments_train = self.comments[split_point:]
+        self.comments_val = self.comments[:split_point]
 
     def create_vocabulary(self,
+                          data,
                           vocabulary_path,
-                          data_path,
                           max_vocabulary_size,
                           tokenizer=None,
                           normalize_digits=True):
@@ -95,8 +125,8 @@ class DataSource():
         token in the first line gets id=0, second line gets id=1, and so on.
 
         Args:
+          data: list of elements to create vocabulary
           vocabulary_path: path where the vocabulary will be created.
-          data_path: data file that will be used to create vocabulary.
           max_vocabulary_size: limit on the size of the created vocabulary.
           tokenizer: a function to use to tokenize each data sentence;
             if None, basic_tokenizer will be used.
@@ -105,20 +135,19 @@ class DataSource():
         if op.exists(vocabulary_path):
             _logger.info('Vocabulary file {} already exists'.format(vocabulary_path))
             return
-        _logger.info("Creating vocabulary %s from data %s" % (vocabulary_path, data_path))
-        vocab = defaultdict(0)
-        with open(data_path) as f:
-            lines = f.readlines()
-        for i, line in enumerate(lines):
+        _logger.info("Creating vocabulary %s" % (vocabulary_path, ))
+        vocab = defaultdict(lambda: 0)
+        _logger.info("Total sentences count = {}".format(len(data)))
+        for i, line in enumerate(data):
             if i % 100000 == 0:
                 _logger.info("  processing line %d" % i)
             tokens = tokenizer(line) if tokenizer else basic_tokenizer(line)
             for w in tokens:
-                word = re.sub(_DIGIT_RE, b"0", w) if normalize_digits else w
+                word = re.sub(_DIGIT_RE, "0", w) if normalize_digits else w
                 vocab[word] += 1
         vocab_list = _START_VOCAB + sorted(vocab, key=vocab.get, reverse=True)
         if len(vocab_list) > max_vocabulary_size:
-            vocab_list = vocab_list[:max_vocabulary_size]
+            vocab_list = map(str, vocab_list[:max_vocabulary_size])
         with open(vocabulary_path, 'w') as vocab_file:
             vocab_file.write("\n".join(vocab_list))
         _logger.info("Vocabulary file {} successfully created".format(vocabulary_path))
@@ -175,10 +204,10 @@ class DataSource():
         if not normalize_digits:
             return [vocabulary.get(w, UNK_ID) for w in words]
         # Normalize digits by 0 before looking words up in the vocabulary.
-        return [vocabulary.get(re.sub(_DIGIT_RE, b"0", w), UNK_ID) for w in words]
+        return [vocabulary.get(re.sub(_DIGIT_RE, "0", w), UNK_ID) for w in words]
 
     def data_to_token_ids(self,
-                          data_path,
+                          data,
                           target_path,
                           vocabulary_path,
                           tokenizer=None,
@@ -201,11 +230,10 @@ class DataSource():
             _logger.info("File with tokens {} already exists".format(target_path))
             return
 
-        _logger.info("Tokenizing data in %s" % data_path)
+        _logger.info("Tokenizing data")
         vocab, _ = self.initialize_vocabulary(vocabulary_path)
-        with open(data_path) as ifile, open(target_path, 'w') as ofile:
-            lines = ifile.readlines()
-            for i, line in enumerate(lines):
+        with open(target_path, 'w') as ofile:
+            for i, line in enumerate(data):
                 if i % 1000 == 0:
                     _logger.info("  tokenizing line %d" % i)
                 token_ids = self.sentence_to_token_ids(line, vocab, tokenizer,
@@ -213,7 +241,6 @@ class DataSource():
                 ofile.write(" ".join([str(tok) for tok in token_ids]) + "\n")
 
     def prepare_data(self,
-                     data_dir,
                      code_vocabulary_size,
                      en_vocabulary_size,
                      tokenizer=None):
@@ -237,26 +264,51 @@ class DataSource():
         """
 
         # Create vocabularies of the appropriate sizes.
-        en_vocab_path = op.join(self.output_dir, "vocab%d.en" % en_vocabulary_size)
-        code_vocab_path = op.join(self.output_dir, "vocab%d.code" % code_vocabulary_size)
-        self.create_vocabulary(en_vocab_path, train_path + ".en", en_vocabulary_size, tokenizer)
-        # create_vocabulary(code_vocab_path, train_path + ".code", code_vocabulary_size, python_tokenizer)
-        self.create_vocabulary(code_vocab_path, train_path + ".code", code_vocabulary_size, tokenizer)
+        self._get_data_db()
+        self._split_data()
+
+        self.comments_vocab_path = op.join(self.output_dir, "vocab%d.en" % en_vocabulary_size)
+        self.code_vocab_path = op.join(self.output_dir, "vocab%d.code" % code_vocabulary_size)
+        self.create_vocabulary(self.comments, self.comments_vocab_path, en_vocabulary_size, tokenizer)
+        self.create_vocabulary(self.codes, self.code_vocab_path, code_vocabulary_size, tokenizer)
 
         # Create token ids for the training data.
-        en_train_ids_path = train_path + (".ids%d.en" % en_vocabulary_size)
-        code_train_ids_path = train_path + (".ids%d.code" % code_vocabulary_size)
-        self.data_to_token_ids(train_path + ".en", en_train_ids_path, en_vocab_path, tokenizer)
-        # data_to_token_ids(train_path + ".code", code_train_ids_path, code_vocab_path, python_tokenizer)
-        self.data_to_token_ids(train_path + ".code", code_train_ids_path, code_vocab_path, tokenizer)
+        en_train_ids_path = self.output_dir + (".ids%d.en" % en_vocabulary_size)
+        code_train_ids_path = self.output_dir + (".ids%d.code" % code_vocabulary_size)
+        self.data_to_token_ids(self.comments_train, en_train_ids_path, self.comments_vocab_path, tokenizer)
+        self.data_to_token_ids(self.codes_train, code_train_ids_path, self.code_vocab_path, tokenizer)
 
-        # Create token ids for the development data.
-        en_dev_ids_path = dev_path + (".ids%d.en" % en_vocabulary_size)
-        code_dev_ids_path = dev_path + (".ids%d.code" % code_vocabulary_size)
-        self.data_to_token_ids(dev_path + ".en", en_dev_ids_path, en_vocab_path, tokenizer)
-        # data_to_token_ids(dev_path + ".code", code_dev_ids_path, code_vocab_path, python_tokenizer)
-        self.data_to_token_ids(dev_path + ".code", code_dev_ids_path, code_vocab_path, tokenizer)
+        # Create token ids for the validation data.
+        en_val_ids_path = self.output_dir + (".ids%d.en" % en_vocabulary_size)
+        code_val_ids_path = self.output_dir + (".ids%d.code" % code_vocabulary_size)
+        self.data_to_token_ids(self.comments_val, en_val_ids_path, self.comments_vocab_path, tokenizer)
+        self.data_to_token_ids(self.codes_val, code_val_ids_path, self.code_vocab_path, tokenizer)
 
         return (code_train_ids_path, en_train_ids_path,
-                code_dev_ids_path, en_dev_ids_path,
-                code_vocab_path, en_vocab_path)
+                code_val_ids_path, en_val_ids_path,
+                self.code_vocab_path, self.comments_vocab_path)
+
+
+def main(dbpath, outputpath, vocab_size):
+    datasrc = DataSource(dbpath, outputpath)
+    datasrc.prepare_data(vocab_size, vocab_size)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser('dataset')
+
+    parser.add_argument('-d', '--db_path', type=str, default=None, help='base path to sqlite DB')
+    parser.add_argument('-o', '--output_path', type=str, default=None, help='base path to output folder')
+    parser.add_argument('-v', '--vocab_size', type=int, default=None, help='size of vocabulary both for input and output sequences')
+
+    args = parser.parse_args()
+    return args
+
+if __name__ == '__main__':
+    args = parse_args()
+
+    if not args.db_path or not args.output_path or not args.vocab_size:
+        _logger.error("USAGE: python datasource.py -d <path to sqlite DB> -o <path to output folder> -v 5000")
+        sys.exit(0)
+
+    main(args.db_path, args.output_path, args.vocab_size)
