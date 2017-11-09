@@ -7,6 +7,7 @@ from collections import defaultdict
 import os.path as op
 import re
 import logging
+import sqlite3
 
 _logger = logging.getLogger(__name__)
 
@@ -72,8 +73,12 @@ def basic_tokenizer(sentence):
 
 class DataSource():
 
-    def __init__(self):
-        pass
+    def __init__(self, dbpath, output_dir, validation_ratio=None):
+        if not op.exists(dbpath):
+            _logger.error("DB doesn't exists at path {}".format(dbpath))
+        self.conn = sqlite3.connect(dbpath)
+        self.validation_ration = validation_ratio if validation_ratio else 0
+        self.output_dir = output_dir
 
     def create_vocabulary(self,
                           vocabulary_path,
@@ -231,17 +236,9 @@ class DataSource():
           (6) path to the English vocabulary file.
         """
 
-        # tokenizer = python_tokenizer
-
-        # print (tokenizer)
-
-        # Specify the data directories.
-        train_path = data_dir + "train/90pt.random"
-        dev_path = data_dir + "dev/10pt.random"
-
         # Create vocabularies of the appropriate sizes.
-        en_vocab_path = op.join(data_dir, "vocab%d.en" % en_vocabulary_size)
-        code_vocab_path = op.join(data_dir, "vocab%d.code" % code_vocabulary_size)
+        en_vocab_path = op.join(self.output_dir, "vocab%d.en" % en_vocabulary_size)
+        code_vocab_path = op.join(self.output_dir, "vocab%d.code" % code_vocabulary_size)
         self.create_vocabulary(en_vocab_path, train_path + ".en", en_vocabulary_size, tokenizer)
         # create_vocabulary(code_vocab_path, train_path + ".code", code_vocabulary_size, python_tokenizer)
         self.create_vocabulary(code_vocab_path, train_path + ".code", code_vocabulary_size, tokenizer)

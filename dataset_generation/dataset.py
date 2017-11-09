@@ -78,7 +78,7 @@ def _clean_str(inpstr):
     return res
 
 
-class CodeCommentDataset():
+class CodeCommentDBForm():
 
     def __init__(self, blockcomment=True, inlinecomment=True, outdb='codecomment.db'):
         self.blockcomment = blockcomment
@@ -88,7 +88,7 @@ class CodeCommentDataset():
 
     def _init_db(self):
         cur = self.conn.cursor()
-        cur.execute('''CREATE TABLE IF NOT EXISTS sources (id INTEGER PRIMARY KEY, path TEXT, repo TEXT)''')
+        cur.execute('''CREATE TABLE IF NOT EXISTS sources (id INTEGER PRIMARY KEY, path TEXT UNIQUE, repo TEXT)''')
         cur.execute('''CREATE TABLE IF NOT EXISTS code_comment (id INTEGER PRIMARY KEY, 
                                                                 code TEXT,
                                                                 comment TEXT,
@@ -118,6 +118,17 @@ class CodeCommentDataset():
                             ''', (e['pair'][0], e['pair'][1], e['linenum'], e['is_inline'], fileids[k]))
         cur.execute('COMMIT')
         _logger.info("Inserting into DB information about founded code-comment pairs finished")
+
+    def _check_str_literal(self, linenum, sources):
+        curline = linenum
+        line = sources[curline]
+        if any(line.strip().startswith(e) and line.count(e) % 2 for e in STR_LITERALS):
+            literal = line.strip()[:3]
+            curline += 1
+            while curline < len(sources) and sources[curline].count(literal) == 0:
+                curline += 1
+            curline += 1
+        return curline
 
     def _get_block_comment(self, source, linenum):
         """ Check for a multiline comment and get the corresponding code.
@@ -172,7 +183,7 @@ class CodeCommentDataset():
         if any(exc in comment.lower() for exc in COMMENT_EXCEPTIONS):
             return (curline, False, (None, None))
 
-        return (curline, True, (code, comment))
+        return (curline, True, ("".join(code), comment))
 
     def _get_pairs(self, filepath):
         """ Extract all code-comment pairs from selected file
@@ -256,17 +267,16 @@ class CodeCommentDataset():
     def _get_dstrings(self, fileslist):
         pass
 
-    def prepare_data_dir(self, srcpath, dstpath):
+    def prepare_data_dir(self, srcpath):
         """ Extract code/comment pairs from all files in directory recursively
 
             Args:
                 srcpath: Path to directory
-                dstpath: Path to output files
 
             Returns
         """
         self.file_comments, self.file_dstrings = _get_file_list(srcpath)
-        self._get_comments(self.file_comments, dstpath)
+        self._get_comments(self.file_comments)
 
     def parse_directories(self, dirs, outputpath):
         """ Extract code/comment pairs from all directories in list
@@ -283,7 +293,7 @@ class CodeCommentDataset():
 
 
 def main(datapath, outputpath):
-    dataset = CodeCommentDataset(blockcomment=False, outdb=outputpath)
+    dataset = CodeCommentDBForm(blockcomment=True, inlinecomment=False, outdb=outputpath)
     dataset.prepare_data_dir(datapath)
 
 
