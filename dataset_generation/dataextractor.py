@@ -4,6 +4,8 @@ import subprocess
 import os.path as op
 from collections import defaultdict
 
+from const import COMMENT_LIST, STR_LITERALS, COMMENT_EXCEPTIONS, INLINE_COMMENT_EXCEPTIONS, CLEAN_CHAR
+
 
 _logger = logging.getLogger(__name__)
 
@@ -11,10 +13,6 @@ logging.basicConfig(
     format='%(asctime)s %(module)s:%(lineno)s %(levelname)s %(message)s',
     level=logging.DEBUG,
 )
-
-
-def _get_subfolders(rootdir):
-    return [d for d in os.listdir(rootdir) if op.isdir(op.join(rootdir, d))]
 
 
 def _show_progress(msg, i, totlen, step=1000):
@@ -33,25 +31,11 @@ def _check_create(path):
         _logger.info("Created directory {}".format(path))
 
 
-def _get_file_list(path):
-    """ Recursively search directory for all source code files
-        (by file extension) containing comments or docstrings
-
-        Args:
-            directory: Search root.
-
-        Returns:
-            Tuple of two lists with files with comments and files with docstrings.
-    """
-    file_comments = subprocess.check_output(["grep -r -l --include \*.py '# ' " + path], shell=True)
-    file_comments = file_comments.splitlines()
-    _logger.info("Found {} files with comments".format(len(file_comments)))
-    doc_strings = subprocess.check_output(["grep -r -l --include \*.py '\"\"\"' " + path], shell=True)
-    file_dstrings = doc_strings.splitlines()
-    doc_strings = subprocess.check_output(["grep -r -l --include \*.py '\'\'\' " + path], shell=True)
-    file_dstrings += doc_strings.splitlines()
-    _logger.info("Found {} files with doc strings".format(len(file_dstrings)))
-    return file_comments, file_dstrings
+def _clean_str(inpstr):
+    res = inpstr
+    for c in CLEAN_CHAR:
+        res = res.replace(c, "")
+    return res
 
 
 class DataExtractor():
@@ -61,18 +45,93 @@ class DataExtractor():
         self.sources = defaultdict(list)
         self.pairs = defaultdict(list)
 
-    def _check_start_block_comment(self, line):
-        pass
+
+    # METHODS FOR SOURCE FILE TEXT PROCESSING
 
     def _exclude_multiline_string_literal(self, linenum, sources):
         line = sources[linenum].strip()
-        # check if line is a start of multiline string literal
+        # check if line is a start of multiline string literal (and not block comment)
         literal = None
         literal_index = 1000000000
         for sl in STR_LITERALS:
+            # we should check all possible quotes types
             if sl in line and line.index(sl) < literal_index:
-        if any(sl in line and line.count(sl) % 2 for sl in STR_LITERALS):
+                literal = sl
+                literal_index = line.index(sl)
+        if not literal:
+            return linenum
+        linenum += 1
+        while sources[linenum].count(sl) % 2 != 1 and linenum < len(sources):
+            linenum += 1
+        return linenum + 1
 
+    def _check_inline_comment(self, line):
+        return "# " in line and not any(e in line.lower() for e in INLINE_COMMENT_EXCEPTIONS)
+
+    def _get_inline_comment(self, line):
+        parts = line.split("# ", 2)
+        code = _clean_str(parts[0].strip())
+        comment = _clean_str(parts[1].strip())
+        return code, comment
+
+    def _check_block_comment(self, line):
+        return line[:2] in COMMENT_LIST
+
+    def _get_block_comment(self, linenum, sources):
+        """ Check for a multiline comment and get the corresponding code.
+
+            Args:
+                linenum: Number of processing string.
+                sources: List of strings of source code file.
+
+            Returns:
+                Tuple (number of line from which continue search, flag, (code, comment))
+        """
+        line = sources[linenum]
+        indentation = len(line) - len(line.lstrip())
+        curindentation = len(line) - len(line.lstrip())
+
+        curline = linenum
+        comment = ""
+        # at first, we should get entire comment (which could be multiline)
+        while curline < len(sources):
+            line = sources[curline]
+            curindentation = len(line) - len(line.lstrip())
+            line = line.strip()
+            # TODO - check this conditions
+            if line[:2] not in COMMENT_LIST or indentation > curindentation:
+                break
+            comment += line[2:] + " "
+            curline += 1
+
+        # check if comment is empty
+        comment = comment.strip()
+        if not comment.strip():
+            return (curline, False, (None, None))
+
+        code = ""
+        while curline < len(sources):
+            line = sources[curline]
+            curindentation = len(line) - len(line.lstrip())
+            line = line.strip()
+            # if we have some elements in code and get an empty line, finish
+            if not line and code:
+                break
+            # if indentation changed or line have an inline comment (???), finish
+            # if indentation > curindentation or (any(c in line for c in COMMENT_LIST)):
+            if indentation > curindentation:
+                break
+            code += " " + line
+            curline += 1
+
+        code = code.strip()
+        if not code:
+            return (curline, False, (None, None))
+
+        if any(exc in comment.lower() for exc in COMMENT_EXCEPTIONS):
+            return (curline, False, (None, None))
+
+        return (curline, True, (code, comment))
 
     def _get_comments(self, filepath):
         """ Extract all code-comment pairs from selected file
@@ -81,7 +140,12 @@ class DataExtractor():
                 filepath: Path to file.
 
             Returns:
-                Tuple (success block comments count, inline comments count, declined block comments count, founded_pairs)
+                Dict {
+                    'accepted_block': [...],
+                    'rejected_block': [...],
+                    'accepted_inline': [...],
+                    'rejected_inline': [...]
+                }
         """
         _logger.info("Started processing of file {}".format(filepath))
         with open(filepath) as f:
@@ -96,39 +160,47 @@ class DataExtractor():
 
         curline = 0
         while curline < len(sources):
-            line = sources[curline]
-            # check if line is begining of str literal
-            if any(line.strip().startswith(e) and line.count(e) % 2 for e in STR_LITERALS):
-                literal = line.strip()[:3]
-                curline += 1
-                while curline < len(sources) and sources[curline].count(literal) == 0:
-                    curline += 1
-                curline += 1
+            # get current line and strip it from spaces/tabs
+            line = sources[curline].strip()
+
+            # 1 - check line is a begining of block comment
+            if self._check_block_comment(line):
+                newlinenum, res, cc_pair = self._get_block_comment(curline, sources)
+                if self.blockcomments:
+                    comments['accepted_block' if res else 'rejected_block'].append({
+                            'pair': cc_pair,
+                            'is_inline': False,
+                            'linenum': curline
+                    })
+                curline = newlinenum
                 continue
 
-            # check if line is begining of block comment
-            if self.blockcomment and line.strip()[:2] in COMMENT_LIST:
-                (curline, success, pair) = self._get_block_comment(sources, curline)
-                if success:
-                    founded_pairs.append({'pair': pair, 'is_inline': False, 'linenum': curline})
-                comments_cnt[success] += 1
+            # 2 - check line is a begining of string literal
+            # probably, string literals (without variables assign)
+            # could be interpreted as block comments
+            newlinenum = self._exclude_multiline_string_literal(curline, sources)
+            if newlinenum != curline:
+                curline = newlinenum
                 continue
 
-            if self.inlinecomment and "# " in line.strip() and not any(e in line.lower() for e in INLINE_COMMENT_EXCEPTIONS):
-                parts = line.split("# ", 2)
-                if len(parts) != 2:
-                    break
-                code = _clean_str(parts[0].strip())
-                comment = _clean_str(parts[1].strip())
-                if code and comment:
-                    founded_pairs.append({'pair': (code, comment), 'is_inline': True, 'linenum': curline})
-                    comments_inline += 1
+            # 3 - check if line contains inline comment
+            if self._check_inline_comment(line):
+                code, comment = self._get_inline_comment(line)
+                if self.inlinecomments:
+                    comments['accepted_inline' if code and comment else 'rejected_block'].append({
+                        'pair': (code, comment),
+                        'is_inline': True,
+                        'linenum': curline
+                    })
+
             curline += 1
 
-        return (comments_cnt[True], comments_inline, comments_cnt[False], founded_pairs)
+        return comments
 
     def _get_dstrings(self, filepath):
-        pass
+        return None
+
+    # METHODS FOR WORK WITH WHOLE FILES AND REPOS
 
     def process_file(self, filepath):
         _logger.info("Processing file {:d}".format(filepath))
@@ -136,49 +208,42 @@ class DataExtractor():
         fds = self._get_dstrings(filepath)
         return fcs, fds
 
+    def _get_file_list(self, path):
+        """ Recursively search directory for all source code files
+            (by file extension) containing comments or docstrings
+
+            Args:
+                directory: Search root.
+
+            Returns:
+                Tuple of two lists with files with comments and files with docstrings.
+        """
+        file_comments = subprocess.check_output(["grep -r -l --include \*.py '# ' " + path], shell=True)
+        file_comments = file_comments.splitlines()
+        _logger.info("Found {} files with comments".format(len(file_comments)))
+        doc_strings = subprocess.check_output(["grep -r -l --include \*.py '\"\"\"' " + path], shell=True)
+        file_dstrings = doc_strings.splitlines()
+        doc_strings = subprocess.check_output(["grep -r -l --include \*.py '\'\'\' " + path], shell=True)
+        file_dstrings += doc_strings.splitlines()
+        _logger.info("Found {} files with doc strings".format(len(file_dstrings)))
+        return file_comments, file_dstrings
+
     def process_repo(self, repodir):
         _logger.info("Processing repository {:d}".format(repodir))
         repo = op.dirname(repodir)
-        repo_files = _get_file_list(repo)
+        repo_files = self._get_file_list(repo)
         for i, rp in enumerate(repo_files):
             _show_progress("Processing {} file of {}", i, len(repo_files))
-            self.process_file(rp)
+            fcs, fds = self.process_file(rp)
 
     def process_folder(self, rootdir):
+        def _get_subfolders(rootdir):
+            return [d for d in os.listdir(rootdir) if op.isdir(op.join(rootdir, d))]
         _logger.info("Data extraction started for root folder {:d}".format(rootdir))
         self.repos = _get_subfolders(rootdir)
         for i, r in enumerate(self.repos):
             _show_progress("Processing {} folder of {}", i, len(self.repos), step=10)
             self.process_repo(op.join(rootdir, r))
 
-    def save_to_db(self, dbpath):
+    def save_to_db_file(self, dbpath):
         pass
-
-
-    def _get_comments(self, fileslist):
-        """ Extract code-comment pairs from all files
-
-            Args:
-                fileslist: List with all files for processing.
-
-            Returns:
-        """
-        founded_pairs = {}
-        normalcomments = 0
-        inlinecomments = 0
-        rejectedcomments = 0
-        for i, file in enumerate(fileslist):
-            if i % 100 == 0:
-                _logger.info("Processed {} files of {}".format(i, len(fileslist)))
-            (x, y, z, pairs) = self._get_pairs(file)
-            founded_pairs[file] = pairs
-            normalcomments += x
-            inlinecomments += y
-            rejectedcomments += z
-
-        _logger.info("Total comments found: {}".format(normalcomments + inlinecomments + rejectedcomments))
-        _logger.info("Normal comments: {}".format(normalcomments))
-        _logger.info("Inline comments: {}".format(inlinecomments))
-        _logger.info("Rejected comments: {}".format(rejectedcomments))
-
-        self._save_result_db(fileslist, founded_pairs)
