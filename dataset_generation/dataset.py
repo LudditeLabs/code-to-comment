@@ -88,8 +88,9 @@ class CodeCommentDBForm():
 
     def _init_db(self):
         cur = self.conn.cursor()
-        cur.execute('''CREATE TABLE IF NOT EXISTS sources (id INTEGER PRIMARY KEY, path TEXT UNIQUE, repo TEXT)''')
-        cur.execute('''CREATE TABLE IF NOT EXISTS code_comment (id INTEGER PRIMARY KEY, 
+        cur.execute('''CREATE TABLE IF NOT EXISTS repositories (id INTEGER PRIMARY KEY, path TEXT UNIQUE, name TEXT)''')
+        cur.execute('''CREATE TABLE IF NOT EXISTS sources (id INTEGER PRIMARY KEY, path TEXT UNIQUE, repo INTEGER)''')
+        cur.execute('''CREATE TABLE IF NOT EXISTS code_comment (id INTEGER PRIMARY KEY,
                                                                 code TEXT,
                                                                 comment TEXT,
                                                                 line INTEGER,

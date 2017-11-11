@@ -285,14 +285,14 @@ class DataSource():
         self.save_vocabulary(self.code_vocab_list, self.code_vocab_path)
 
         # Create token ids for the training data.
-        en_train_ids_path = self.output_dir + ("/comments_train.ids%d.en" % en_vocabulary_size)
-        code_train_ids_path = self.output_dir + ("/code_train.ids%d.code" % code_vocabulary_size)
+        en_train_ids_path = self.output_dir + ("/train.ids%d.en" % en_vocabulary_size)
+        code_train_ids_path = self.output_dir + ("/train.ids%d.code" % code_vocabulary_size)
         self.data_to_token_ids(self.comments_train, en_train_ids_path, self.comments_vocab_path, tokenizer)
         self.data_to_token_ids(self.codes_train, code_train_ids_path, self.code_vocab_path, tokenizer)
 
         # Create token ids for the validation data.
-        en_val_ids_path = self.output_dir + ("/comments_val.ids%d.en" % en_vocabulary_size)
-        code_val_ids_path = self.output_dir + ("/code_val.ids%d.code" % code_vocabulary_size)
+        en_val_ids_path = self.output_dir + ("/val.ids%d.en" % en_vocabulary_size)
+        code_val_ids_path = self.output_dir + ("/val.ids%d.code" % code_vocabulary_size)
         self.data_to_token_ids(self.comments_val, en_val_ids_path, self.comments_vocab_path, tokenizer)
         self.data_to_token_ids(self.codes_val, code_val_ids_path, self.code_vocab_path, tokenizer)
 
