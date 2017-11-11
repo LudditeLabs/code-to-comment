@@ -1,6 +1,6 @@
-# Find filepaths to files containing a string, such as: "# "
-# grep -r -l --include \*.py "# "
-# grep -r -l --include \*.py '"""'
+"""
+    Class for DB
+"""
 
 import argparse
 import logging
@@ -76,6 +76,38 @@ def _clean_str(inpstr):
     for c in CLEAN_CHAR:
         res = res.replace(c, "")
     return res
+
+
+class CodeCommentDB():
+
+    def __init__(self, outdb='codecomment.db'):
+        self.conn = sqlite3.connect(outdb)
+        self._init_db()
+
+    def _init_db(self):
+        cur = self.conn.cursor()
+        cur.execute('''CREATE TABLE IF NOT EXISTS repositories (id INTEGER PRIMARY KEY, path TEXT UNIQUE, name TEXT)''')
+        cur.execute('''CREATE TABLE IF NOT EXISTS sources (id INTEGER PRIMARY KEY, path TEXT UNIQUE, repo INTEGER)''')
+        cur.execute('''CREATE TABLE IF NOT EXISTS code_comment (id INTEGER PRIMARY KEY,
+                                                                code TEXT,
+                                                                comment TEXT,
+                                                                line INTEGER,
+                                                                is_inline INTEGER,
+                                                                source_id INTEGER)''')
+
+    def save_cc_pair(self, pair):
+        pass
+
+    def save_file_data(self, fd):
+        cur = self.conn.cursor()
+        cur.execute('''INSERT OR IGNORE INTO sources (path, repo) VALUES (?, ?)''', (f, ''))
+        fileids[f] = cur.lastrowid
+
+    def save_repo_data(self, rd):
+        pass
+
+    def get_codecomment_pairs(self, params):
+        pass
 
 
 class CodeCommentDBForm():
