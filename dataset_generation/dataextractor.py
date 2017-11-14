@@ -203,10 +203,24 @@ class DataExtractor():
     # METHODS FOR WORK WITH WHOLE FILES AND REPOS
 
     def process_file(self, filepath):
+        """ Extract all code-comments (in future - docstrings) pairs from selected file
+
+            Args:
+                filepath: path to file to extract code-comment pairs
+
+            Returns:
+                List of dicts with format
+                    Dict {
+                        'accepted_block': [...],
+                        'rejected_block': [...],
+                        'accepted_inline': [...],
+                        'rejected_inline': [...]
+                    }
+        """
         _logger.info("Processing file {:d}".format(filepath))
         fcs = self._get_comments(filepath)
-        fds = self._get_dstrings(filepath)
-        return fcs, fds
+        #  fds = self._get_dstrings(filepath)
+        return fcs
 
     def _get_file_list(self, path):
         """ Recursively search directory for all source code files
@@ -229,21 +243,56 @@ class DataExtractor():
         return file_comments, file_dstrings
 
     def process_repo(self, repodir):
+        """ Extract all code-comment pairs from one repository
+
+            Args:
+                repodir: repository root directory
+
+            Returns:
+                List of dicts with following format
+                    {
+                        'fpath': path to file in repo,
+                        'pairs': all founded code pairs
+                    }
+        """
         _logger.info("Processing repository {:d}".format(repodir))
         repo = op.dirname(repodir)
         repo_files = self._get_file_list(repo)
-        for i, rp in enumerate(repo_files):
+        repo_data = {'repopath': repodir, 'files': []}
+        for i, fp in enumerate(repo_files):
             _show_progress("Processing {} file of {}", i, len(repo_files))
-            fcs, fds = self.process_file(rp)
+            fcs, fds = self.process_file(fp)
+            repo_data['files'].append({'filepath': fp, 'pairs': fcs})
+        return repo_data
 
     def process_folder(self, rootdir):
+        """ Process whole folder. Each subfolder of rootdir interpreted as repository
+
+            Args:
+                rootdir: processing folder
+
+            Returns:
+                List of dicts with following fomrat
+                    {
+                        'rpath': path to rootdir subfolder,
+                        'files': list of dicts
+                    }
+                    'files' elements have following format
+                        {
+                            'fpath': path to file in repo,
+                            'pairs': all founded code pairs
+                        }
+        """
         def _get_subfolders(rootdir):
             return [d for d in os.listdir(rootdir) if op.isdir(op.join(rootdir, d))]
         _logger.info("Data extraction started for root folder {:d}".format(rootdir))
         self.repos = _get_subfolders(rootdir)
+        all_data = {'rootdir': rootdir, 'repos': []}
         for i, r in enumerate(self.repos):
             _show_progress("Processing {} folder of {}", i, len(self.repos), step=10)
-            self.process_repo(op.join(rootdir, r))
+            repo_data = self.process_repo(op.join(rootdir, r))
+            all_data['repos'].append(repo_data)
+        return all_data
 
     def save_to_db_file(self, dbpath):
         pass

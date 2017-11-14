@@ -95,15 +95,73 @@ class CodeCommentDB():
                                                                 is_inline INTEGER,
                                                                 source_id INTEGER)''')
 
-    def save_cc_pair(self, pair):
+    def save_cc_pairs(self, pd):
+        """ Save all pairs from pd parameter to DB
+
+            Args:
+                pd: dict with following fields {'srcid': int, 'pairs': list_of_dicts}
+                'pairs' element have following structure
+                    Dict {
+                        'pair': tuple(code, comment),
+                        'is_inline': boolean,
+                        'linenum': int
+                    }
+        """
+        cur = self.conn.cursor()
+        srcid = pd['srcid']
+        pairs = pd['pairs']
+        _logger.info("Inserting into DB information about founded code-comment pairs started")
+        cur.execute('BEGIN TRANSACTION')
+        for k, v in pairs.items():
+            for e in v:
+                cur.execute('''INSERT OR IGNORE INTO 
+                                    code_comment (code, comment, line, is_inline, source_id)
+                                VALUES
+                                    (?, ?, ?, ?, ?)
+                            ''', (e['pair'][0], e['pair'][1], e['linenum'], e['is_inline'], srcid))
+        cur.execute('COMMIT')
+        _logger.info("Inserting into DB information about founded code-comment pairs finished")
         pass
 
     def save_file_data(self, fd):
+        """ Save all information about source file (both about filepath and all founded in file code-comment pairs) into DB
+
+            Args:
+                fd: dict with file description {'fpath': fp, 'repoid': repo, 'pairs': pairs}
+                    pairs - dict with structure
+                        Dict {
+                            'accepted_block': [...],
+                            'rejected_block': [...],
+                            'accepted_inline': [...],
+                            'rejected_inline': [...]
+                        }
+                        all lists contains dicts with following structure
+                            Dict {
+                                'pair': tuple(code, comment),
+                                'is_inline': boolean,
+                                'linenum': int
+                            }
+        """
+        _logger.info("Inserting into DB information about file {} started".format(fd['fpath']))
         cur = self.conn.cursor()
-        cur.execute('''INSERT OR IGNORE INTO sources (path, repo) VALUES (?, ?)''', (f, ''))
-        fileids[f] = cur.lastrowid
+        cur.execute('''INSERT OR IGNORE INTO sources (path, repo) VALUES (?, ?)''', (fd['fpath'], fd['repoid']))
+        srcid = cur.lastrowid
+        p = fd['pairs']
+        pairs = p['accepted_block'] + p['accepted_inline']
+        pd = {'scrid': srcid, 'pairs': pairs}
+        self.save_cc_pairs(pd)
+        _logger.info("Inserting into DB information about file {} finished".format(fd['fpath']))
+        return srcid
 
     def save_repo_data(self, rd):
+        _logger.info("Inserting into DB information about repository {} started".format(rd['rpath']))
+        cur = self.conn.cursor()
+        cur.execute('''INSERT OR IGNORE repositories (path, name) VALUES (?, ?)''', (rd['rpath'], ''))
+        repoid = cur.lastrowid
+        for fd in rd['files']:
+            fd['repoid'] = repoid
+            self.save_file_data(fd)
+        _logger.info("Inserting into DB information about repository {} finished".format(rd['rpath']))
         pass
 
     def get_codecomment_pairs(self, params):
