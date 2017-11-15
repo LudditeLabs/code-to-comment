@@ -12,6 +12,7 @@ import logging
 import sqlite3
 import argparse
 import sys
+from database import CodeCommentDB
 
 _logger = logging.getLogger(__name__)
 
@@ -80,7 +81,8 @@ class DataSource():
     def __init__(self, dbpath, output_dir, validation_ratio=0.1):
         if not op.exists(dbpath):
             _logger.error("DB doesn't exists at path {}".format(dbpath))
-        self.conn = sqlite3.connect(dbpath)
+            raise
+        self.db = CodeCommentDB(dbpath)
         self.validation_ratio = validation_ratio if validation_ratio else 0
         self.output_dir = output_dir
         self.codes = []
@@ -91,9 +93,8 @@ class DataSource():
         self.comments_val = []
 
     def _get_data_db(self, inline=False):
-        cur = self.conn.cursor()
-        cur.execute("SELECT code, comment FROM code_comment WHERE is_inline=0")  # Temporary decision
-        res = cur.fetchall()
+        params = {'inline': inline}
+        res = self.db.get_codecomment_pairs(params)
         if not res:
             return
         for r in res:

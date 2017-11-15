@@ -2,8 +2,10 @@ import os
 import logging
 import subprocess
 import os.path as op
+import sys
+import argparse
 from collections import defaultdict
-
+from database import CodeCommentDB
 from const import COMMENT_LIST, STR_LITERALS, COMMENT_EXCEPTIONS, INLINE_COMMENT_EXCEPTIONS, CLEAN_CHAR
 
 
@@ -40,11 +42,13 @@ def _clean_str(inpstr):
 
 class DataExtractor():
 
-    def __init__(self):
+    def __init__(self, outdb='codecomment.db', blockcomments=True, inlinecomments=True):
         self.repos = []
         self.sources = defaultdict(list)
         self.pairs = defaultdict(list)
-
+        self.blockcomments = blockcomments
+        self.inlinecomments = inlinecomments
+        self.db = CodeCommentDB(outdb)
 
     # METHODS FOR SOURCE FILE TEXT PROCESSING
 
@@ -55,13 +59,13 @@ class DataExtractor():
         literal_index = 1000000000
         for sl in STR_LITERALS:
             # we should check all possible quotes types
-            if sl in line and line.index(sl) < literal_index:
+            if sl in line and line.count(sl) % 2 and line.index(sl) < literal_index:
                 literal = sl
                 literal_index = line.index(sl)
         if not literal:
             return linenum
         linenum += 1
-        while sources[linenum].count(sl) % 2 != 1 and linenum < len(sources):
+        while linenum < len(sources) and sources[linenum].count(sl) % 2 != 1:
             linenum += 1
         return linenum + 1
 
@@ -217,7 +221,7 @@ class DataExtractor():
                         'rejected_inline': [...]
                     }
         """
-        _logger.info("Processing file {:d}".format(filepath))
+        _logger.info("Processing file {:s}".format(filepath))
         fcs = self._get_comments(filepath)
         #  fds = self._get_dstrings(filepath)
         return fcs
@@ -235,12 +239,15 @@ class DataExtractor():
         file_comments = subprocess.check_output(["grep -r -l --include \*.py '# ' " + path], shell=True)
         file_comments = file_comments.splitlines()
         _logger.info("Found {} files with comments".format(len(file_comments)))
+        """
         doc_strings = subprocess.check_output(["grep -r -l --include \*.py '\"\"\"' " + path], shell=True)
         file_dstrings = doc_strings.splitlines()
         doc_strings = subprocess.check_output(["grep -r -l --include \*.py '\'\'\' " + path], shell=True)
         file_dstrings += doc_strings.splitlines()
         _logger.info("Found {} files with doc strings".format(len(file_dstrings)))
         return file_comments, file_dstrings
+        """
+        return file_comments
 
     def process_repo(self, repodir):
         """ Extract all code-comment pairs from one repository
@@ -255,14 +262,15 @@ class DataExtractor():
                         'pairs': all founded code pairs
                     }
         """
-        _logger.info("Processing repository {:d}".format(repodir))
+        _logger.info("Processing repository {:s}".format(repodir))
         repo = op.dirname(repodir)
-        repo_files = self._get_file_list(repo)
-        repo_data = {'repopath': repodir, 'files': []}
+        repo_files = self._get_file_list(repodir)
+        repo_data = {'rpath': repodir, 'files': []}
         for i, fp in enumerate(repo_files):
             _show_progress("Processing {} file of {}", i, len(repo_files))
-            fcs, fds = self.process_file(fp)
-            repo_data['files'].append({'filepath': fp, 'pairs': fcs})
+            fcs = self.process_file(fp)
+            repo_data['files'].append({'fpath': fp, 'pairs': fcs})
+        self.db.save_repo_data(repo_data)
         return repo_data
 
     def process_folder(self, rootdir):
@@ -285,7 +293,7 @@ class DataExtractor():
         """
         def _get_subfolders(rootdir):
             return [d for d in os.listdir(rootdir) if op.isdir(op.join(rootdir, d))]
-        _logger.info("Data extraction started for root folder {:d}".format(rootdir))
+        _logger.info("Data extraction started for root folder {:s}".format(rootdir))
         self.repos = _get_subfolders(rootdir)
         all_data = {'rootdir': rootdir, 'repos': []}
         for i, r in enumerate(self.repos):
@@ -294,5 +302,26 @@ class DataExtractor():
             all_data['repos'].append(repo_data)
         return all_data
 
-    def save_to_db_file(self, dbpath):
-        pass
+
+def main(datapath, outputpath):
+    dataset = DataExtractor(outdb=outputpath)
+    dataset.process_folder(datapath)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser('dataextractor')
+
+    parser.add_argument('-d', '--data_path', type=str, default=None, help='base path to data folder')
+    parser.add_argument('-o', '--output_path', type=str, default=None, help='base path to output sqlite db')
+
+    args = parser.parse_args()
+    return args
+
+if __name__ == '__main__':
+    args = parse_args()
+
+    if not args.data_path or not args.output_path:
+        _logger.error("USAGE: python dataextractor.py -d <path to directory with source code> -o <path to output file>")
+        sys.exit(0)
+
+    main(args.data_path, args.output_path)
