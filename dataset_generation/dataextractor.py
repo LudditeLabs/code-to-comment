@@ -110,7 +110,7 @@ class DataExtractor():
 
         # check if comment is empty
         comment = comment.strip()
-        if not comment.strip():
+        if not comment:
             return (curline, False, (None, None))
 
         code = ""
@@ -125,7 +125,7 @@ class DataExtractor():
             # if indentation > curindentation or (any(c in line for c in COMMENT_LIST)):
             if indentation > curindentation:
                 break
-            code += " " + line
+            code += line + " "
             curline += 1
 
         code = code.strip()

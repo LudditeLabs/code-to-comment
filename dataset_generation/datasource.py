@@ -95,9 +95,11 @@ class DataSource():
         if not res:
             return
         for r in res:
-            if r[0] and r[1]:
-                self.codes.append(r[0])
-                self.comments.append(r[1])
+            code = r[0].replace('\n', ' ').replace('\t', ' ').replace('  ', '').strip()
+            comment = r[1].replace('\n', ' ').replace('\t', ' ').replace('  ', '').strip()
+            if code and comment:
+                self.codes.append(code)
+                self.comments.append(comment)
 
     def _split_data(self):
         if not self.validation_ratio:
@@ -118,6 +120,9 @@ class DataSource():
         with codecs.open(vocabulary_path, 'w', encoding='utf-8') as vocab_file:
             vocab_file.write("\n".join(vocab))
         _logger.info("Vocabulary file {} successfully created".format(vocabulary_path))
+
+    def tokenize_data(self, data, tokenizer=None, normalize_digits=True):
+        return [" ".join(tokenizer(sentence)) if tokenizer else " ".join(basic_tokenizer(sentence)) for sentence in data]
 
     def create_vocabulary(self,
                           data,
@@ -250,9 +255,8 @@ class DataSource():
             _logger.info("File with data {} already exists".format(target_path))
             return
 
-        fdata = [d.replace('\n', ' ').replace('\t', ' ').replace('  ', '').strip() for d in data]
         with codecs.open(target_path, 'w', encoding='utf-8') as ofile:
-            ofile.write('\n'.join(fdata))                
+            ofile.write('\n'.join(data))
 
     def prepare_data(self,
                      code_vocabulary_size,
@@ -287,13 +291,25 @@ class DataSource():
         # Save text files with training and validation data
         en_train_path = self.output_dir + "/train{}.en".format(en_vocabulary_size)
         code_train_path = self.output_dir + "/train{}.code".format(code_vocabulary_size)
-        self.save_data(self.comments_train, en_train_path)
-        self.save_data(self.codes_train, code_train_path)
+        #self.save_data(self.comments_train, en_train_path)
+        #self.save_data(self.codes_train, code_train_path)
+
+        self.tokenized_comments_train = self.tokenize_data(self.comments_train)
+        self.tokenized_codes_train = self.tokenize_data(self.codes_train)
+
+        self.save_data(self.tokenized_comments_train, en_train_path)
+        self.save_data(self.tokenized_codes_train, code_train_path)
 
         en_val_path = self.output_dir + "/val{}.en".format(en_vocabulary_size)
         code_val_path = self.output_dir + "/val{}.code".format(code_vocabulary_size)
-        self.save_data(self.comments_val, en_val_path)
-        self.save_data(self.codes_val, code_val_path)
+        #self.save_data(self.comments_val, en_val_path)
+        #self.save_data(self.codes_val, code_val_path)
+
+        self.tokenized_comments_val = self.tokenize_data(self.comments_val)
+        self.tokenized_codes_val = self.tokenize_data(self.codes_val)
+
+        self.save_data(self.tokenized_comments_val, en_val_path)
+        self.save_data(self.tokenized_codes_val, code_val_path)
 
         # Create and save vocabularies
         self.comments_vocab_path = op.join(self.output_dir, "vocab%d.en" % en_vocabulary_size)
