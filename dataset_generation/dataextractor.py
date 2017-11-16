@@ -59,7 +59,7 @@ class DataExtractor():
         literal_index = 1000000000
         for sl in STR_LITERALS:
             # we should check all possible quotes types
-            if sl in line and line.count(sl) % 2 and line.index(sl) < literal_index:
+            if line.count(sl) % 2 and line.index(sl) < literal_index:
                 literal = sl
                 literal_index = line.index(sl)
         if not literal:
@@ -79,7 +79,7 @@ class DataExtractor():
         return code, comment
 
     def _check_block_comment(self, line):
-        return line[:2] in COMMENT_LIST
+        return any(line.startswith(c) for c in COMMENT_LIST) and not any(line.startswith(c) for c in COMMENT_EXCEPTIONS)
 
     def _get_block_comment(self, linenum, sources):
         """ Check for a multiline comment and get the corresponding code.
@@ -97,20 +97,24 @@ class DataExtractor():
 
         curline = linenum
         comment = ""
+        dropcomment = False
         # at first, we should get entire comment (which could be multiline)
         while curline < len(sources):
             line = sources[curline]
             curindentation = len(line) - len(line.lstrip())
             line = line.strip()
-            # TODO - check this conditions
-            if line[:2] not in COMMENT_LIST or indentation > curindentation:
+            # if we found any comment exception in any line of multiline comment
+            # we just drop all this comment
+            if any(line.startswith(c) for c in COMMENT_EXCEPTIONS):
+                dropcomment = True
+            if not line.startswith('#') or indentation > curindentation:
                 break
             comment += line[2:] + " "
             curline += 1
 
         # check if comment is empty
         comment = comment.strip()
-        if not comment:
+        if not comment or dropcomment:
             return (curline, False, (None, None))
 
         code = ""
@@ -182,10 +186,12 @@ class DataExtractor():
             # 2 - check line is a begining of string literal
             # probably, string literals (without variables assign)
             # could be interpreted as block comments
+            """
             newlinenum = self._exclude_multiline_string_literal(curline, sources)
             if newlinenum != curline:
                 curline = newlinenum
                 continue
+            """
 
             # 3 - check if line contains inline comment
             if self._check_inline_comment(line):
