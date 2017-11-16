@@ -22,8 +22,8 @@ logging.basicConfig(
 
 # Special vocabulary symbols - we always put them at the start.
 _UNK = "<unk>"
-_SOS = "<sos>"
-_EOS = "</sos>"
+_SOS = "<s>"
+_EOS = "</s>"
 _START_VOCAB = [_UNK, _SOS, _EOS]
 
 UNK_ID = 0
@@ -95,8 +95,9 @@ class DataSource():
         if not res:
             return
         for r in res:
-            self.codes.append(r[0])
-            self.comments.append(r[1])
+            if r[0] and r[1]:
+                self.codes.append(r[0])
+                self.comments.append(r[1])
 
     def _split_data(self):
         if not self.validation_ratio:
@@ -244,6 +245,15 @@ class DataSource():
                                                        normalize_digits)
                 ofile.write(" ".join([str(tok) for tok in token_ids]) + "\n")
 
+    def save_data(self, data, target_path):
+        if op.exists(target_path):
+            _logger.info("File with data {} already exists".format(target_path))
+            return
+
+        fdata = [d.replace('\n', ' ').replace('\t', ' ').replace('  ', '').strip() for d in data]
+        with codecs.open(target_path, 'w', encoding='utf-8') as ofile:
+            ofile.write('\n'.join(fdata))                
+
     def prepare_data(self,
                      code_vocabulary_size,
                      en_vocabulary_size,
@@ -274,6 +284,18 @@ class DataSource():
         self._get_data_db()
         self._split_data()
 
+        # Save text files with training and validation data
+        en_train_path = self.output_dir + "/train{}.en".format(en_vocabulary_size)
+        code_train_path = self.output_dir + "/train{}.code".format(code_vocabulary_size)
+        self.save_data(self.comments_train, en_train_path)
+        self.save_data(self.codes_train, code_train_path)
+
+        en_val_path = self.output_dir + "/val{}.en".format(en_vocabulary_size)
+        code_val_path = self.output_dir + "/val{}.code".format(code_vocabulary_size)
+        self.save_data(self.comments_val, en_val_path)
+        self.save_data(self.codes_val, code_val_path)
+
+        # Create and save vocabularies
         self.comments_vocab_path = op.join(self.output_dir, "vocab%d.en" % en_vocabulary_size)
         self.code_vocab_path = op.join(self.output_dir, "vocab%d.code" % code_vocabulary_size)
 
