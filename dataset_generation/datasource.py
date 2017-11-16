@@ -9,7 +9,6 @@ import os
 import os.path as op
 import re
 import logging
-import sqlite3
 import argparse
 import sys
 from database import CodeCommentDB
@@ -22,16 +21,14 @@ logging.basicConfig(
 )
 
 # Special vocabulary symbols - we always put them at the start.
-_PAD = "_PAD"
-_GO = "_GO"
-_EOS = "_EOS"
-_UNK = "_UNK"
-_START_VOCAB = [_PAD, _GO, _EOS, _UNK]
+_UNK = "<unk>"
+_SOS = "<sos>"
+_EOS = "</sos>"
+_START_VOCAB = [_UNK, _SOS, _EOS]
 
-PAD_ID = 0
-GO_ID = 1
+UNK_ID = 0
+SOS_ID = 1
 EOS_ID = 2
-UNK_ID = 3
 
 # Regular expressions used to tokenize.
 _WORD_SPLIT = re.compile("([`.,!?\"':;)(])")
