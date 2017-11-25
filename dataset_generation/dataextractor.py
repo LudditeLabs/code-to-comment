@@ -6,7 +6,7 @@ import sys
 import argparse
 from collections import defaultdict
 from database import CodeCommentDB
-from const import COMMENT_LIST, STR_LITERALS, COMMENT_EXCEPTIONS, INLINE_COMMENT_EXCEPTIONS, CLEAN_CHAR
+from const import COMMENT_LIST, STR_LITERALS, COMMENT_EXCEPTIONS, CLEAN_CHAR
 
 
 _logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ class DataExtractor():
         return linenum + 1
 
     def _check_inline_comment(self, line):
-        return "# " in line and not any(e in line.lower() for e in INLINE_COMMENT_EXCEPTIONS)
+        return "# " in line and not any(e in line.lower() for e in COMMENT_EXCEPTIONS)
 
     def _get_inline_comment(self, line):
         parts = line.split("# ", 2)
@@ -129,6 +129,9 @@ class DataExtractor():
             # if indentation > curindentation or (any(c in line for c in COMMENT_LIST)):
             if indentation > curindentation:
                 break
+            # discard all text after # (inline comment)
+            if '#' in code:
+                code = code.split('#', 2)[0]
             code += line + " "
             curline += 1
 

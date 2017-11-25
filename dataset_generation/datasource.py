@@ -31,7 +31,7 @@ SOS_ID = 1
 EOS_ID = 2
 
 # Regular expressions used to tokenize.
-_WORD_SPLIT = re.compile("([`.,!?\"':;)(])")
+_WORD_SPLIT = re.compile("([`.,!?\"':;)(]+-=*/)")
 _DIGIT_RE = re.compile(r"\d")
 
 
@@ -89,7 +89,7 @@ class DataSource():
         self.comments_train = []
         self.comments_val = []
 
-    def _get_data_db(self, inline=False):
+    def _get_data_db(self, inline=False, max_seq_len=40):
         params = {'inline': inline}
         res = self.db.get_codecomment_pairs(params)
         if not res:
@@ -97,7 +97,9 @@ class DataSource():
         for r in res:
             code = r[0].replace('\n', ' ').replace('\t', ' ').replace('  ', '').strip()
             comment = r[1].replace('\n', ' ').replace('\t', ' ').replace('  ', '').strip()
-            if code and comment:
+            code_list = code.split(' ')
+            comment_list = code.split(' ')
+            if code and comment and len(code_list) < max_seq_len and len(comment_list) < max_seq_len:
                 self.codes.append(code)
                 self.comments.append(comment)
 
