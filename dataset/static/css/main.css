@@ -1,0 +1,23 @@
+/* custom styles */
+
+.container {
+  width: 800px;
+  margin: 10px;
+}
+
+table tr td,select,input,textarea {
+    font-family: monospace;
+}
+#db-name {
+    width: 100px;
+}
+.hint {
+    font: 9pt tahoma;
+    color: grey;
+}
+td {
+    vertical-align: top;
+}
+.code {
+    background-color: yellow;
+}

@@ -102,7 +102,7 @@ class CodeCommentDB():
             self.save_file_data(fd)
         _logger.info("Inserting into DB information about repository {} finished".format(rd['rpath']))
 
-    def get_codecomment_pairs(self, params):
+    def get_codecomment_pairs(self, params={}):
         cur = self.conn.cursor()
         sql = "SELECT code, comment FROM code_comment"
         where = []
