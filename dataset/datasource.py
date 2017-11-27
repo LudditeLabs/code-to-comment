@@ -126,8 +126,8 @@ class DataSource():
     def tokenize_data(self, data, tokenizer=None, normalize_digits=True):
         return [" ".join(tokenizer(sentence)) if tokenizer else " ".join(basic_tokenizer(sentence)) for sentence in data]
 
-    def create_vocabulary(self,
-                          data,
+    @staticmethod
+    def create_vocabulary(data,
                           max_vocabulary_size,
                           tokenizer=None,
                           normalize_digits=True):
@@ -142,7 +142,7 @@ class DataSource():
         Args:
           data: list of elements to create vocabulary
           vocabulary_path: path where the vocabulary will be created.
-          max_vocabulary_size: limit on the size of the created vocabulary.
+          max_vocabulary_size: limit on the size of the created vocabulary. None for unlimited vocabulary.
           tokenizer: a function to use to tokenize each data sentence;
             if None, basic_tokenizer will be used.
           normalize_digits: Boolean; if true, all digits are replaced by 0s.
@@ -159,7 +159,7 @@ class DataSource():
                 word = re.sub(_DIGIT_RE, "0", w) if normalize_digits else w
                 vocab[word] += 1
         vocab_list = _START_VOCAB + sorted(vocab, key=vocab.get, reverse=True)
-        if len(vocab_list) > max_vocabulary_size:
+        if max_vocabulary_size and len(vocab_list) > max_vocabulary_size:
             vocab_list = vocab_list[:max_vocabulary_size]
         _logger.info("Vocabulary forming finished")
         return vocab_list, vocab
@@ -317,9 +317,9 @@ class DataSource():
         self.comments_vocab_path = op.join(self.output_dir, "vocab%d.en" % en_vocabulary_size)
         self.code_vocab_path = op.join(self.output_dir, "vocab%d.code" % code_vocabulary_size)
 
-        self.comments_vocab_list, self.comments_vocab = self.create_vocabulary(self.comments, en_vocabulary_size, tokenizer)
+        self.comments_vocab_list, self.comments_vocab = DataSource.create_vocabulary(self.comments, en_vocabulary_size, tokenizer)
         self.save_vocabulary(self.comments_vocab_list, self.comments_vocab_path)
-        self.code_vocab_list, self.code_vocab = self.create_vocabulary(self.codes, code_vocabulary_size, tokenizer)
+        self.code_vocab_list, self.code_vocab = DataSource.create_vocabulary(self.codes, code_vocabulary_size, tokenizer)
         self.save_vocabulary(self.code_vocab_list, self.code_vocab_path)
 
         # Create token ids for the training data.
