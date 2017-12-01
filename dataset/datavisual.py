@@ -6,6 +6,7 @@ import argparse
 import logging
 import matplotlib.pyplot as plt
 import seaborn as sns
+from collections import defaultdict
 from database import CodeCommentDB
 from datasource import DataSource
 from const import BUCKETS
@@ -27,6 +28,23 @@ class DataVisualizer():
     def __init__(self, dbpath):
         self.db = CodeCommentDB(dbpath)
         self.tokenized_cc = None
+
+    def seq_distribution(self, iscode, max_val=100, bins=20):
+        codecomments = self.db.get_codecomment_pairs()
+        ind = 0 if iscode else 1
+        data = [len(p[ind]) for p in codecomments]
+        plt.hist(data, bins=bins, range=(0, max_val))
+        return
+
+    def words_distribution(self, iscode, max_vocabulary_size=None, max_val=1000, bins=20):
+        codecomments = self.db.get_codecomment_pairs()
+        ind = 0 if iscode else 1
+        data = [p[ind] for p in codecomments]
+        _, vocab = DataSource.create_vocabulary(data, max_vocabulary_size)
+        freq = list(vocab.values())
+        plt.hist(freq, bins=bins, range=(0, max_val if max_val else max(freq)))
+        return
+
 
     def sort_by_buckets(self, data, buckets=None):
         """ Sort code comment pairs by buckets
