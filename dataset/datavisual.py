@@ -30,21 +30,18 @@ class DataVisualizer():
         self.tokenized_cc = None
 
     def seq_distribution(self, iscode, max_val=100, bins=20):
-        codecomments = self.db.get_codecomment_pairs()
-        ind = 0 if iscode else 1
+        codecomments = self.get_tokenized_data()
+        ind = CODE_INDEX if iscode else COMMENT_INDEX
         data = [len(p[ind]) for p in codecomments]
         plt.hist(data, bins=bins, range=(0, max_val))
-        return
 
     def words_distribution(self, iscode, max_vocabulary_size=None, max_val=1000, bins=20):
-        codecomments = self.db.get_codecomment_pairs()
-        ind = 0 if iscode else 1
+        codecomments = self.get_tokenized_data()
+        ind = CODE_INDEX if iscode else COMMENT_INDEX
         data = [p[ind] for p in codecomments]
         _, vocab = DataSource.create_vocabulary(data, max_vocabulary_size)
         freq = list(vocab.values())
         plt.hist(freq, bins=bins, range=(0, max_val if max_val else max(freq)))
-        return
-
 
     def sort_by_buckets(self, data, buckets=None):
         """ Sort code comment pairs by buckets
@@ -62,8 +59,8 @@ class DataVisualizer():
         buckets_cnt = [len(filter(lambda x: x > buckets[i-1] and x < buckets[i], data)) for i in range(1, len(buckets))]
         return buckets_cnt
 
-    def seq_lens(self, data, comment=False):
-        ind = COMMENT_INDEX if comment else CODE_INDEX
+    def seq_lens(self, data, iscode=True):
+        ind = COMMENT_INDEX if iscode else CODE_INDEX
         d = [len(p[ind]) for p in data]
         return d
 
@@ -78,19 +75,19 @@ class DataVisualizer():
 
     def get_comments_lens(self):
         codecomments = self.get_tokenized_data()
-        return self.seq_lens(codecomments, comment=True)
+        return self.seq_lens(codecomments, iscode=False)
 
     def get_codes_lens(self):
         codecomments = self.get_tokenized_data()
-        return self.seq_lens(codecomments, comment=False)
+        return self.seq_lens(codecomments, iscode=True)
 
-    def form_hist(self, comment=False, **kwargs):
+    def form_hist(self, iscode=True, **kwargs):
         """ Form a distribution histogram among buckets
         """
         valid_hist_args = {"bins", "range"}
         hist_args = {k:v for k, v in kwargs.items() if k in valid_hist_args}
         codecomments = self.get_tokenized_data()
-        distr = self.seq_lens(codecomments, comment=comment)
+        distr = self.seq_lens(codecomments, iscode=iscode)
         plt.hist(distr, **hist_args)
 
     def form_percentile(self, **kwargs):
