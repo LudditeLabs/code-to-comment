@@ -123,7 +123,8 @@ class DataSource():
             vocab_file.write("\n".join(vocab))
         _logger.info("Vocabulary file {} successfully created".format(vocabulary_path))
 
-    def tokenize_data(self, data, tokenizer=None, normalize_digits=True):
+    @staticmethod
+    def tokenize_data(data, tokenizer=None, normalize_digits=True):
         return [" ".join(tokenizer(sentence)) if tokenizer else " ".join(basic_tokenizer(sentence)) for sentence in data]
 
     def create_vocabulary(self,
@@ -296,8 +297,8 @@ class DataSource():
         #self.save_data(self.comments_train, en_train_path)
         #self.save_data(self.codes_train, code_train_path)
 
-        self.tokenized_comments_train = self.tokenize_data(self.comments_train)
-        self.tokenized_codes_train = self.tokenize_data(self.codes_train)
+        self.tokenized_comments_train = DataSource.tokenize_data(self.comments_train)
+        self.tokenized_codes_train = DataSource.tokenize_data(self.codes_train)
 
         self.save_data(self.tokenized_comments_train, en_train_path)
         self.save_data(self.tokenized_codes_train, code_train_path)
@@ -307,8 +308,8 @@ class DataSource():
         #self.save_data(self.comments_val, en_val_path)
         #self.save_data(self.codes_val, code_val_path)
 
-        self.tokenized_comments_val = self.tokenize_data(self.comments_val)
-        self.tokenized_codes_val = self.tokenize_data(self.codes_val)
+        self.tokenized_comments_val = DataSource.tokenize_data(self.comments_val)
+        self.tokenized_codes_val = DataSource.tokenize_data(self.codes_val)
 
         self.save_data(self.tokenized_comments_val, en_val_path)
         self.save_data(self.tokenized_codes_val, code_val_path)
