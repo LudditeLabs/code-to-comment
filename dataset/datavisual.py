@@ -68,8 +68,10 @@ class DataVisualizer():
         if self.tokenized_cc and not refresh:
             return self.tokenized_cc
         codecomments = self.db.get_codecomment_pairs()
+        code = [p[0] for p in codecomments]
+        comments = [p[1] for p in codecomments]
         tok = DataSource.tokenize_data
-        tokenized_cc = [(tok(p[0]), tok(p[1])) for p in codecomments]
+        tokenized_cc = list(zip(tok(code), tok(comments)))
         self.tokenized_cc = tokenized_cc
         return tokenized_cc
 
@@ -97,8 +99,8 @@ class DataVisualizer():
 
 
 def main():
-    c = DataVisualizer('codecomment.db')
-    r = c.form_hist()
+    c = DataVisualizer('./dataset/codebase_new.db')
+    c.words_distribution(False, 5000)
 
 
 if __name__ == '__main__':

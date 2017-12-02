@@ -31,7 +31,7 @@ SOS_ID = 1
 EOS_ID = 2
 
 # Regular expressions used to tokenize.
-_WORD_SPLIT = re.compile("([`.,!?\"':;)(]+-=*/)")
+_WORD_SPLIT = re.compile("([`[\].,!?\"':;)(+-=*/])")
 _DIGIT_RE = re.compile(r"\d")
 
 
@@ -89,7 +89,7 @@ class DataSource():
         self.comments_train = []
         self.comments_val = []
 
-    def _get_data_db(self, inline=False, max_seq_len=40):
+    def _get_data_db(self, inline=False, max_seq_len=50):
         params = {'inline': inline}
         res = self.db.get_codecomment_pairs(params)
         if not res:
@@ -162,6 +162,7 @@ class DataSource():
         vocab_list = _START_VOCAB + sorted(vocab, key=vocab.get, reverse=True)
         if max_vocabulary_size and len(vocab_list) > max_vocabulary_size:
             vocab_list = vocab_list[:max_vocabulary_size]
+            vocab = {w: vocab.get(w, 0) for w in vocab_list}
         _logger.info("Vocabulary forming finished")
         return vocab_list, vocab
 
