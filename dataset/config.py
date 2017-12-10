@@ -1,2 +1,2 @@
 class BaseConfig(object):
-    DBPATH = "codecomment.db"
+    DBPATH = "codebase_new.db"

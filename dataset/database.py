@@ -31,6 +31,123 @@ class CodeCommentDB():
                                                                 is_inline INTEGER,
                                                                 source_id INTEGER)''')
 
+    def get_files_repo(self, cur, repo_id):
+        cur.execute('SELECT id, path, repo FROM sources WHERE repo=?', (repo_id,))
+        return cur.fetchall()
+
+    def get_pairs_file(self, cur, source_id):
+        cur.execute('SELECT id, code, comment, line, is_inline, source_id FROM code_comment WHERE source_id=?', (source_id,))
+        return cur.fetchall()
+
+    def get_pairs_repo(self, cur, repo_id):
+        sources = self.get_files_repo(cur, repo_id)
+        ccpairs = []
+        for s in sources:
+            ccpairs.extend(self.get_pairs_file(cur, s[0]))
+        return ccpairs
+
+    def _get_paris_info(self, ccpairs):
+        codes = [cc[1] for cc in ccpairs]
+        comments = [cc[2] for cc in ccpairs]
+        codes_len = list(map(lambda x: len(x), codes))
+        comments_len = list(map(lambda x: len(x), comments))
+        return codes, comments, codes_len, comments_len
+
+    def get_db_info(self):
+        """ Return short summary about all data in DB
+
+            Args:
+        """
+        res = {}
+        cur = self.conn.cursor()
+        cur.execute('SELECT COUNT(*) FROM repositories')
+        res['rcount'] = cur.fetchone()[0]
+        cur.execute('SELECT COUNT(*) FROM sources')
+        res['scount'] = cur.fetchone()[0]
+        cur.execute('SELECT COUNT(*) FROM code_comment')
+        res['pcount'] = cur.fetchone()[0]
+        cur.execute('SELECT COUNT(*) FROM code_comment WHERE is_inline=1')
+        res['picount'] = cur.fetchone()[0]
+        cur.execute('SELECT COUNT(*) FROM code_comment WHERE is_inline=0')
+        res['pbcount'] = cur.fetchone()[0]
+
+        cur.execute('SELECT id, path FROM repositories')
+        repos_data = cur.fetchall()
+        repos = []
+        ccpairs = []
+        for rn in repos_data:
+            rinfo = self.get_repo_info(rn[1])
+            repos.append(rinfo)
+            ccpairs.extend(rinfo['pairs'])
+
+        codes, comments, codes_len, comments_len = self._get_paris_info(ccpairs)
+
+        res['repos'] = repos
+        res['pairs'] = ccpairs
+        res['ccpairs'] = len(ccpairs)
+        res['codes'] = codes
+        res['comments'] = comments
+        res['codes_len'] = codes_len
+        res['comments_len'] = comments_len
+        res['avgcode'] = sum(codes_len) / float(len(codes_len)) if len(codes_len) else 0
+        res['avgcomment'] = sum(comments_len) / float(len(comments_len)) if len(comments_len) else 0
+        return res
+
+    def get_repo_info(self, rpath):
+        """ Return short summary about particular repo
+
+            Args:
+        """
+        cur = self.conn.cursor()
+        cur.execute('SELECT id FROM repositories WHERE path=?', (rpath,))
+        repo_id = cur.fetchone()
+        if not repo_id:
+            _logger.error("Couldn't locate in DB repository with path {}".format(rpath))
+            return {}
+        repo_id = repo_id[0]
+
+        repo_files = self.get_files_repo(cur, repo_id)
+        rsources = []
+        ccpairs_repo = []
+        for rp in repo_files:
+            sinfo = self.get_source_info(rp[0])
+            rsources.append(sinfo)
+            ccpairs_repo.extend(sinfo['pairs'])
+
+        codes, comments, codes_len, comments_len = self._get_paris_info(ccpairs_repo)
+        rinfo = {
+            'rpath': rpath,
+            'sources_cnt': len(rsources),
+            'sources': rsources,
+            'pairs': ccpairs_repo,
+            'ccpairs': len(ccpairs_repo),
+            'codes': codes,
+            'comments': comments,
+            'codes_len': codes_len,
+            'comments_len': comments_len,
+            'avgcode': sum(codes_len) / float(len(codes_len)) if len(codes_len) else 0,
+            'avgcomment': sum(comments_len) / float(len(comments_len)) if len(comments_len) else 0,
+        }
+
+        return rinfo
+
+    def get_source_info(self, spath):
+        cur = self.conn.cursor()
+        ccpairs_file = self.get_pairs_file(cur, spath)
+        codes, comments, codes_len, comments_len = self._get_paris_info(ccpairs_file)
+        sinfo = {
+            'path': spath,
+            'pairs': ccpairs_file,
+            'ccpairs': len(ccpairs_file),
+            'codes': codes,
+            'comments': comments,
+            'codes_len': codes_len,
+            'comments_len': comments_len,
+            'avgcode': sum(codes_len) / float(len(codes_len)) if len(codes_len) else 0,
+            'avgcomment': sum(comments_len) / float(len(comments_len)) if len(comments_len) else 0,
+        }
+        return sinfo
+
     def save_cc_pairs(self, pd):
         """ Save all pairs from pd parameter to DB
 
