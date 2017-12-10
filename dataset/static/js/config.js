@@ -5,7 +5,8 @@ require.config({
     baseUrl: '',
     paths: {
         'jquery': 'static/js/jquery-3.2.1.min',
-        'bootstrap' : '//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min'
+        'popper': 'https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min',
+        'bootstrap' : 'https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min'
     },
 });
 

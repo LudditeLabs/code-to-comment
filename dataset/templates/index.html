@@ -2,10 +2,15 @@
 
 {% block content %}
 
-<table>
-<tr><td class='db-name'>Select path to DB:</td><td><select id="dbpath"></select></td></tr>
-<tr><td></td><td><input type="button" value="Submit" id="btn-submit"></td></tr>
-</table>
+<div class='index-page'></div>
 
+<div class="row">
+    <div class="col">Select path to DB</div>
+    <div class="w-100"></div>
+    <div class="col"><select id="dbpath"></select></div>
+    <div class="w-100"></div>
+    <div class="col"><input type="button" value="Submit" id="btn-submit"></div>
+    <div class="col"><input type="button" value="Load" id="btn-load"></div>
+</div>
 
 {% endblock %}

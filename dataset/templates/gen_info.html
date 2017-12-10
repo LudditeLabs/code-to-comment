@@ -1,0 +1,64 @@
+{% extends "_base.html" %} {% block content %}
+
+<div class='gen-info-page'></div>
+
+<div class="row">
+    <div class="col">
+        <table class='repo-info'>
+            <thead>
+                <tr>
+                    <th colspan="2">General information</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Total repositories count</td>
+                    <td>{{ ginfo.rcount }}</td>
+                </tr>
+                <tr>
+                    <td>Total source files count</td>
+                    <td>{{ ginfo.scount }}</td>
+                </tr>
+                <tr>
+                    <td>Total code-comment pairs count</td>
+                    <td>{{ ginfo.pcount }}</td>
+                </tr>
+                <tr>
+                    <td>Inline code-comment pairs count</td>
+                    <td>{{ ginfo.picount }}</td>
+                </tr>
+                <tr>
+                    <td>Block code-comment pairs count</td>
+                    <td>{{ ginfo.pbcount }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="col">
+        <table class='repo-info'>
+            <thead>
+                <tr>
+                    <th colspan="2">List of all repositories</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="table-header">
+                    <td>Repository name</td>
+                    <td>Count of files in repository</td>
+                </tr>
+                {% for repo in ginfo.repos %}
+                <tr>
+                    <td>
+                        <a href='#' class='repo-ref'>{{ repo.rpath }}</a>
+                    </td>
+                    <td>{{ repo.sources_cnt }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="w-100"></div>
+    <div class="col center-block">Place for figures</div>
+</div>
+
+{% endblock %}

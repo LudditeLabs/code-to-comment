@@ -1,0 +1,46 @@
+{% extends "_base.html" %}
+
+{% block content %}
+
+<div class='repo-info-page'></div>
+
+<table class='repo-info'>
+<thead><tr><th colspan="2">{{ repo.rpath }}</th></tr></thead>
+<tbody>
+<tr><td>Total source files count</td><td>{{ repo.sources_cnt }}</td></tr>
+<tr><td>Total code-comment pairs count</td><td>{{ repo.ccpairs }}</td></tr>
+<tr><td>Inline code-comment pairs count</td><td></td></tr>
+<tr><td>Block code-comment pairs count</td><td></td></tr>
+<tr><td>Average code sequence length</td><td>{{ repo.avgcode }}</td></tr>
+<tr><td>Average comment sequence length</td><td>{{ repo.avgcode }}</td></tr>
+</tbody>
+</table>
+
+<table class='repo-info'>
+<thead>
+<tr><th colspan="2">List of all sources</th></tr>
+</thead>
+<tbody>
+<tr class="table-header"><td>Source path</td><td>Count of code-comment pairs from file</td></tr>
+{% for source in repo.sources %}
+<tr><td>{{ source.path }}</td><td>{{ source.ccpairs }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+
+
+<link
+href="http://cdn.pydata.org/bokeh/release/bokeh-0.12.7.min.css"
+rel="stylesheet" type="text/css">
+<link
+href="http://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.7.min.css"
+rel="stylesheet" type="text/css">
+{{ the_div|safe }}
+<script src="http://cdn.pydata.org/bokeh/release/bokeh-0.12.7.min.js"></script>
+<script src="http://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.7.min.js"></script>
+{{ the_script|safe }}
+
+{{ the_div2|safe }}
+{{ the_script2|safe }}
+
+{% endblock %}

@@ -1,14 +1,77 @@
 /* custom styles */
 
-.container {
-  width: 800px;
-  margin: 10px;
+/* Set height of the grid so .sidenav can be 100% (adjust as needed) */
+.row.content {height: 450px}
+
+/* Set gray background color and 100% height */
+.sidenav {
+padding-top: 20px;
+background-color: #f1f1f1;
+height: 100%;
+}
+
+/* Set black background color, white text and some padding */
+footer {
+background-color: #555;
+color: white;
+padding: 15px;
+}
+
+/* On small screens, set height to 'auto' for sidenav and grid */
+@media screen and (max-width: 767px) {
+.sidenav {
+    height: auto;
+    padding: 15px;
+}
+.row.content {height:auto;} 
+}
+
+
+
+.container th, td {
+}
+
+table, tr, th, td {
+    border: 1px solid black;
 }
 
 table tr td,select,input,textarea {
     font-family: monospace;
 }
-#db-name {
+
+table.repo-info {
+    witdht: 80%;
+}
+
+table.repo-info tbody tr td,thead tr th {
+    /*
+    border-style: solid;
+    border-width: thin;
+    border-color: blue;
+    */
+    margin: auto;
+    text-align: center;
+    font: 14pt;
+    padding: 8px;
+}
+
+table.repo-info tbody,thead {
+    display: block;
+}
+
+table.repo-info tbody {
+    overflow-y: auto;
+    height: 500px;
+}
+
+table.repo-info th {
+    text-align: center;
+    font: 16pt tahoma bold;
+}
+
+table.repo-info tr:nth-child(even){background-color: #f2f2f2}
+
+.db-name {
     width: 100px;
 }
 .hint {
@@ -20,4 +83,9 @@ td {
 }
 .code {
     background-color: yellow;
+}
+
+.table-header {
+    text-align: center;
+    font: 16pt tahoma bold;
 }

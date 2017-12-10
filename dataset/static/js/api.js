@@ -23,14 +23,21 @@ define(['jquery'], function($) {
 
             var def = $.Deferred(),
                 ops = _getOpts(opt),
-                url = ops.baseURL,
+                //url = ops.baseURL,
+                url = name,
                 args_tst = {
                     'q': 'i = i + 1;',
                 },
                 args = {};
 
-            ff = ops.$files;
+            console.log('###')
+            console.log(params)
+            args.data = JSON.stringify(params);
+            console.log(args)
 
+            // ff = ops.$files;
+
+            /*
             if (ff && ff.length) {
                 var data = new FormData();
 
@@ -48,14 +55,11 @@ define(['jquery'], function($) {
             } else {
                 args.data = JSON.stringify(params);
             }
+            */
 
             $.post( 
                 url,
-                args_tst,
-                function(data, status){
-                    alert("Data: " + data + "\nStatus: " + status);
-                    def.resolve(status)
-                }
+                params
             );
 
 
