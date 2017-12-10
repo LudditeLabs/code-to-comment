@@ -4,6 +4,8 @@
 
 import logging
 import sqlite3
+import os.path as op
+import json
 
 
 _logger = logging.getLogger(__name__)
@@ -19,6 +21,30 @@ class CodeCommentDB():
     def __init__(self, outdb='codecomment.db'):
         self.conn = sqlite3.connect(outdb)
         self._init_db()
+        self.cached = False
+        self.ginfo = None
+        self.cache_path = './cached.tmp'
+        if not self._check_newdata() and op.exists(self.cache_path):
+            self.cached = True
+            self.ginfo = self._load_cache()
+
+    def _save_cache(self, cache):
+        json.dump(cache, open(self.cache_path, 'w'))
+
+    def _load_cache(self):
+        return json.load(open(self.cache_path, 'r'))
+
+    def _check_newdata(self):
+        cur = self.conn.cursor()
+        cur.execute('SELECT value FROM tmp WHERE option="cached"''')
+        res = cur.fetchone()
+        if not res:
+            return res
+        return res[0]
+
+    def _set_newdata(self, value):
+        cur = self.conn.cursor()
+        cur.execute('''UPDATE tmp SET value=? WHERE option="cached"''', (value,))
 
     def _init_db(self):
         cur = self.conn.cursor()
@@ -30,6 +56,12 @@ class CodeCommentDB():
                                                                 line INTEGER,
                                                                 is_inline INTEGER,
                                                                 source_id INTEGER)''')
+        cur.execute('''CREATE TABLE IF NOT EXISTS tmp (option TEXT PRIMARY KEY, value INTEGER)''')
+        if not self._check_newdata():
+            cur.execute('''INSERT OR IGNORE INTO 
+                                    tmp (option, value)
+                            VALUES
+                                ("cached", 0)''')
 
     def get_files_repo(self, cur, repo_id):
         cur.execute('SELECT id, path, repo FROM sources WHERE repo=?', (repo_id,))
@@ -58,6 +90,8 @@ class CodeCommentDB():
 
             Args:
         """
+        if self.cached:
+            return self.ginfo
         res = {}
         cur = self.conn.cursor()
         cur.execute('SELECT COUNT(*) FROM repositories')
@@ -91,6 +125,12 @@ class CodeCommentDB():
         res['comments_len'] = comments_len
         res['avgcode'] = sum(codes_len) / float(len(codes_len)) if len(codes_len) else 0
         res['avgcomment'] = sum(comments_len) / float(len(comments_len)) if len(comments_len) else 0
+
+        self.cached = True
+        self.ginfo = res
+        self._save_cache(self.ginfo)
+        self._set_newdata(0)
+
         return res
 
     def get_repo_info(self, rpath):
@@ -98,6 +138,10 @@ class CodeCommentDB():
 
             Args:
         """
+        if self.cached:
+            for r in self.ginfo['repos']:
+                if r['rpath'] == rpath:
+                    return r
         cur = self.conn.cursor()
         cur.execute('SELECT id FROM repositories WHERE path=?', (rpath,))
         repo_id = cur.fetchone()
@@ -160,6 +204,7 @@ class CodeCommentDB():
                         'linenum': int
                     }
         """
+        self._set_newdata(1)
         cur = self.conn.cursor()
         srcid = pd['srcid']
         pairs = pd['pairs']
@@ -198,6 +243,7 @@ class CodeCommentDB():
                                 'linenum': int
                             }
         """
+        self._set_newdata(1)
         _logger.info("Inserting into DB information about file {} started".format(fd['fpath']))
         cur = self.conn.cursor()
         cur.execute('''INSERT OR IGNORE INTO sources (path, repo) VALUES (?, ?)''', (fd['fpath'], fd['repoid']))
@@ -210,6 +256,7 @@ class CodeCommentDB():
         return srcid
 
     def save_repo_data(self, rd):
+        self._set_newdata(1)
         _logger.info("Inserting into DB information about repository {} started".format(rd['rpath']))
         cur = self.conn.cursor()
         cur.execute('''INSERT OR IGNORE INTO repositories (path, name) VALUES (?, ?)''', (rd['rpath'], ''))
