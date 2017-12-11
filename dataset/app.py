@@ -12,10 +12,7 @@ from database import CodeCommentDB
 import logging
 
 import numpy as np
-from bokeh.layouts import gridplot
-from bokeh.plotting import figure, show, output_file
-from bokeh.embed import components
-from bokeh.models.tools import BoxSelectTool, BoxZoomTool, SaveTool, PanTool, ZoomInTool, ZoomOutTool
+from datavisual import DataVisualizer
 
 app = Flask(__name__, static_url_path='/static')
 app.config.from_object(BaseConfig)
@@ -41,7 +38,22 @@ def gen_info():
         return 'Error'
     ccdb = CodeCommentDB(dbpath)
     gen_info = ccdb.get_db_info()
-    return render_template('gen_info.html', ginfo=gen_info)
+
+    codes_len = gen_info['codes_len']
+    comments_len = gen_info['comments_len']
+    hist_params = {
+        'title': "Distribution of code sequences lengths",
+        'plot_width': 500,
+        'plot_height': 300,
+        'bins': 500
+    }
+    script, div = DataVisualizer.generate_web_hist(codes_len, hist_params)
+    hist_params['title'] = "Distribution of comments sequences lengths"
+    script2, div2 = DataVisualizer.generate_web_hist(comments_len, hist_params)
+
+    return render_template('gen_info.html', ginfo=gen_info,
+                           the_div=div, the_script=script,
+                           the_div2=div2, the_script2=script2)
 
 
 @app.route('/repo_info', methods=['POST'])
@@ -55,37 +67,15 @@ def repo_info():
     codes_len = repo['codes_len']
     comments_len = repo['comments_len']
 
-    tools = [BoxSelectTool(), BoxZoomTool(), SaveTool(), PanTool(), ZoomInTool(), ZoomOutTool()]
-
-    p1 = figure(title="Distribution of code sequences lengths", plot_width=500, tools=tools,
-                toolbar_location="below", plot_height=300, background_fill_color="#E8DDCB")
-
-    hist, edges = np.histogram(codes_len, density=True, bins=50)
-
-    p1.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:],
-            fill_color="#036564", line_color="#033649")
-
-    p1.legend.location = "center_right"
-    p1.legend.background_fill_color = "darkgrey"
-    p1.xaxis.axis_label = 'Sequence len'
-    p1.yaxis.axis_label = 'Count'
-
-    script, div = components(p1)
-
-    p2 = figure(title="Distribution of comments sequences lengths", plot_width=500, tools=tools,
-                toolbar_location="below", plot_height=300, background_fill_color="#E8DDCB")
-
-    hist, edges = np.histogram(comments_len, density=True, bins=50)
-
-    p2.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:],
-            fill_color="#036564", line_color="#033649")
-
-    p2.legend.location = "center_right"
-    p2.legend.background_fill_color = "darkgrey"
-    p2.xaxis.axis_label = 'Sequence len'
-    p2.yaxis.axis_label = 'Count'
-
-    script2, div2 = components(p2)
+    hist_params = {
+        'title': "Distribution of code sequences lengths",
+        'plot_width': 500,
+        'plot_height': 300,
+        'bins': 500
+    }
+    script, div = DataVisualizer.generate_web_hist(codes_len, hist_params)
+    hist_params['title'] = "Distribution of comments sequences lengths"
+    script2, div2 = DataVisualizer.generate_web_hist(comments_len, hist_params)
 
     return render_template('repo_info.html', repo=repo,
                            the_div=div, the_script=script,

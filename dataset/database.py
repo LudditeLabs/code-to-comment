@@ -154,7 +154,7 @@ class CodeCommentDB():
         rsources = []
         ccpairs_repo = []
         for rp in repo_files:
-            sinfo = self.get_source_info(rp[0])
+            sinfo = self.get_source_info(rp[0], rp[1])
             rsources.append(sinfo)
             ccpairs_repo.extend(sinfo['pairs'])
 
@@ -175,7 +175,7 @@ class CodeCommentDB():
 
         return rinfo
 
-    def get_source_info(self, spath):
+    def get_source_info(self, sid, spath):
         cur = self.conn.cursor()
         ccpairs_file = self.get_pairs_file(cur, spath)
         codes, comments, codes_len, comments_len = self._get_paris_info(ccpairs_file)

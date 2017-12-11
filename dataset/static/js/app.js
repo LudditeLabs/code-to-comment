@@ -62,5 +62,25 @@ define(['jquery', 'static/js/api'], function ($, api) {
         $('.repo-ref').each(function (i, obj) {
             $(obj).on('click', DoPost);
         });
+
+        var $table = $('.repo-info'),
+        $bodyCells = $table.map( function() { return $(this).find('tbody tr:first').children();} ).get(),
+        colWidth, totalWidth;
+
+        // Get the tbody columns width array
+        colWidth = $bodyCells.map(function(obj) {
+            return obj.map(function() {
+                return $(this).width();
+            }).get();
+        });
+        
+        totalWidth = colWidth.map(function(obj) { return obj.reduce(add, 0);});
+
+        function add(a, b) {
+            return a + b;
+        }
+
+        // Set the width of thead columns
+        $table.each(function(ind, obj) { el=$(obj).find('thead tr').children()[0]; $(el).width(totalWidth[ind]); });
     }
 });

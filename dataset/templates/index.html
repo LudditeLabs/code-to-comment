@@ -1,16 +1,24 @@
-{% extends "_base.html" %}
-
-{% block content %}
+{% extends "_base.html" %} {% block content %}
 
 <div class='index-page'></div>
 
-<div class="row">
-    <div class="col">Select path to DB</div>
-    <div class="w-100"></div>
-    <div class="col"><select id="dbpath"></select></div>
-    <div class="w-100"></div>
-    <div class="col"><input type="button" value="Submit" id="btn-submit"></div>
-    <div class="col"><input type="button" value="Load" id="btn-load"></div>
+<div class="container">
+    <div class="row">
+        <div class="col">Select path to DB</div>
+    </div>
+    <div class="row">
+        <div class="col">
+            <select id="dbpath"></select>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col">
+            <input type="button" value="Submit" id="btn-submit">
+        </div>
+        <div class="col">
+            <input type="button" value="Load" id="btn-load">
+        </div>
+    </div>
 </div>
 
 {% endblock %}

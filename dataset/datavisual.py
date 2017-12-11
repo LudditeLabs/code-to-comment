@@ -6,10 +6,16 @@ import argparse
 import logging
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
 from collections import defaultdict
 from database import CodeCommentDB
 from datasource import DataSource
 from const import BUCKETS
+
+from bokeh.layouts import gridplot
+from bokeh.plotting import figure, show, output_file
+from bokeh.embed import components
+from bokeh.models.tools import BoxSelectTool, BoxZoomTool, SaveTool, PanTool, ZoomInTool, ZoomOutTool
 
 _logger = logging.getLogger(__name__)
 
@@ -96,6 +102,33 @@ class DataVisualizer():
         codecomments = self.get_tokenized_data()
         distr = self.seq_lens(codecomments)
         sns.distplot(distr)
+
+    @staticmethod
+    def generate_web_hist(data, hist_params):
+        hp = hist_params
+        _logger.info("Generation of web plot started. Params: {}".format(hp))
+        def_tools = [BoxSelectTool(), BoxZoomTool(), SaveTool(), PanTool(), ZoomInTool(), ZoomOutTool()]
+        p1 = figure(
+            title=hp.get('title', 'Title'),
+            plot_width=hp.get('plot_width', 500),
+            tools=hp.get('tools', def_tools),
+            toolbar_location="below",
+            plot_height=hp.get('plot_height', 300),
+            background_fill_color="#E8DDCB"
+        )
+
+        hist, edges = np.histogram(data, density=True, bins=hp.get('bins', 500))
+
+        p1.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:],
+                fill_color="#036564", line_color="#033649")
+
+        p1.legend.location = "center_right"
+        p1.legend.background_fill_color = "darkgrey"
+        p1.xaxis.axis_label = 'Sequence len'
+        p1.yaxis.axis_label = 'Count'
+
+        script, div = components(p1)
+        return script, div
 
 
 def main():

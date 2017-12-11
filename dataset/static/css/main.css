@@ -1,3 +1,78 @@
+/* General syles */
+
+table tr td,select,input,textarea {
+    font-family: monospace;
+}
+
+
+/* Tables related styles */
+
+table.repo-info {
+    width: 90%;
+    border-spacing: 0;
+}
+
+table.repo-info tbody,
+table.repo-info thead { display: block; }
+
+table.repo-info tbody tr td,table.repo-info thead tr th {
+    margin: auto;
+    text-align: center;
+    padding: 8px;
+}
+
+table.repo-info tbody {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 500px;
+    border: 2px solid black;
+}
+
+table.repo-info th {
+    text-align: center;
+    font: 16pt tahoma bold;
+}
+
+table.repo-info tbody tr:nth-child(even){background-color: #f2f2f2}
+
+table.repo-info tbody tr, table.repo-info thead th, table.repo-info tbody td {
+    border-right: 1px solid black;
+    border-bottom: 1px solid black;
+}
+
+table.repo-info tbody td:last-child, table.repo-info thead th:last-child {
+    border-right: none;
+    border-bottom: none;
+}
+
+td {
+    vertical-align: top;
+}
+
+
+
+
+
+
+
+.db-name {
+    width: 100px;
+}
+.hint {
+    font: 9pt tahoma;
+    color: grey;
+}
+
+.code {
+    background-color: yellow;
+}
+
+.table-header {
+    text-align: center;
+    font: 16pt tahoma bold;
+}
+
+
 /* custom styles */
 
 /* Set height of the grid so .sidenav can be 100% (adjust as needed) */
@@ -24,68 +99,4 @@ padding: 15px;
     padding: 15px;
 }
 .row.content {height:auto;} 
-}
-
-
-
-.container th, td {
-}
-
-table, tr, th, td {
-    border: 1px solid black;
-}
-
-table tr td,select,input,textarea {
-    font-family: monospace;
-}
-
-table.repo-info {
-    witdht: 80%;
-}
-
-table.repo-info tbody tr td,thead tr th {
-    /*
-    border-style: solid;
-    border-width: thin;
-    border-color: blue;
-    */
-    margin: auto;
-    text-align: center;
-    font: 14pt;
-    padding: 8px;
-}
-
-table.repo-info tbody,thead {
-    display: block;
-}
-
-table.repo-info tbody {
-    overflow-y: auto;
-    height: 500px;
-}
-
-table.repo-info th {
-    text-align: center;
-    font: 16pt tahoma bold;
-}
-
-table.repo-info tr:nth-child(even){background-color: #f2f2f2}
-
-.db-name {
-    width: 100px;
-}
-.hint {
-    font: 9pt tahoma;
-    color: grey;
-}
-td {
-    vertical-align: top;
-}
-.code {
-    background-color: yellow;
-}
-
-.table-header {
-    text-align: center;
-    font: 16pt tahoma bold;
 }
